@@ -1,0 +1,44 @@
+# ......................................................................
+
+# XHTML Inline Structural Module  ......................................
+
+# file: xhtml-inlstruct-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-inlstruct-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Inline Structural 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-inlstruct-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Inline Structural
+# 
+#    br, span
+# 
+# This module declares the elements and their attributes
+# used to support inline-level structural markup.
+
+# br: forced line break .............................
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+br.content = empty
+br = element br { br.attlist, br.content }
+# end of br.element
+br.attlist &= Core.attrib
+# end of br.attlist
+
+# span: generic inline container ....................
+span.content = (text | Inline.mix)*
+span = element span { span.attlist, span.content }
+# end of span.element
+span.attlist &= Common.attrib
+# end of span.attlist
+
+# end of xhtml-inlstruct-1.mod

@@ -1,0 +1,14 @@
+Blog generator in CL
+
+A blog is not really dynamic content, and so should be served as static, which means we can use a generator.
+
+drafts - contains our input
+published - contains published drafts
+site - contains processed version of the published articles
+
+We use a database for the metadata.
+
+We expect to be editting content in emacs
+
+
+We use the blog in content as a way of documenting progress :-)

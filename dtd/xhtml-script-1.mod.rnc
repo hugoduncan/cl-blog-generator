@@ -1,0 +1,53 @@
+# ......................................................................
+
+# XHTML Document Scripting Module  .....................................
+
+# file: xhtml-script-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-script-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Scripting 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-script-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Scripting
+# 
+#    script, noscript
+# 
+# This module declares element types and attributes used to provide
+# support for executable scripts as well as an alternate content
+# container where scripts are not supported.
+
+# script: Scripting Statement .......................
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+script.content = text
+script = element script { script.attlist, script.content }
+# end of script.element
+script.attlist &=
+  XHTML.xmlns.attrib,
+  id.attrib,
+  [ a:defaultValue = "preserve" ] attribute xml:space { "preserve" }?,
+  attribute charset { Charset.datatype }?,
+  attribute type { ContentType.datatype },
+  attribute src { URI.datatype }?,
+  attribute defer { "defer" }?
+# end of script.attlist
+
+# noscript: No-Script Alternate Content .............
+noscript.content = Block.mix+
+noscript = element noscript { noscript.attlist, noscript.content }
+# end of noscript.element
+noscript.attlist &= Common.attrib
+# end of noscript.attlist
+
+# end of xhtml-script-1.mod

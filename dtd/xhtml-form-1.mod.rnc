@@ -1,0 +1,209 @@
+# ......................................................................
+
+# XHTML Forms Module  ..................................................
+
+# file: xhtml-form-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-form-1.mod,v 4.1 2001/04/10 09:42:30 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Forms 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-form-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Forms
+# 
+#    form, label, input, select, optgroup, option,
+#    textarea, fieldset, legend, button
+# 
+# This module declares markup to provide support for online
+# forms, based on the features found in HTML 4 forms.
+
+# declare qualified element type names:
+
+# %BlkNoForm.mix; includes all non-form block elements,
+# plus %Misc.class;
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+BlkNoForm.mix =
+  Heading.class
+  | List.class
+  | BlkStruct.class
+  | BlkPhras.class
+  | BlkPres.class
+  | Table.class
+  | Block.extra
+  | Misc.class
+# form: Form Element ................................
+form.content = (BlkNoForm.mix | fieldset)+
+form = element form { form.attlist, form.content }
+# end of form.element
+form.attlist &=
+  Common.attrib,
+  attribute action { URI.datatype },
+  [ a:defaultValue = "get" ] attribute method { "get" | "post" }?,
+  [ a:defaultValue = "application/x-www-form-urlencoded" ]
+  attribute enctype { ContentType.datatype }?,
+  attribute accept-charset { Charsets.datatype }?,
+  attribute accept { ContentTypes.datatype }?
+# end of form.attlist
+
+# label: Form Field Label Text ......................
+
+# Each label must not contain more than ONE field
+label.content =
+  (text
+   | input
+   | select
+   | textarea
+   | button
+   | InlStruct.class
+   | InlPhras.class
+   | I18n.class
+   | InlPres.class
+   | Anchor.class
+   | InlSpecial.class
+   | Inline.extra
+   | Misc.class)*
+label = element label { label.attlist, label.content }
+# end of label.element
+label.attlist &=
+  Common.attrib,
+  attribute for { xsd:IDREF }?,
+  attribute accesskey { Character.datatype }?
+# end of label.attlist
+
+# input: Form Control ...............................
+input.content = empty
+input = element input { input.attlist, input.content }
+# end of input.element
+InputType.class =
+  "text"
+  | "password"
+  | "checkbox"
+  | "radio"
+  | "submit"
+  | "reset"
+  | "file"
+  | "hidden"
+  | "image"
+  | "button"
+# attribute 'name' required for all but submit & reset
+input.attlist &=
+  Common.attrib,
+  [ a:defaultValue = "text" ] attribute type { InputType.class }?,
+  attribute name { text }?,
+  attribute value { text }?,
+  attribute checked { "checked" }?,
+  attribute disabled { "disabled" }?,
+  attribute readonly { "readonly" }?,
+  attribute size { Number.datatype }?,
+  attribute maxlength { Number.datatype }?,
+  attribute src { URI.datatype }?,
+  attribute alt { Text.datatype }?,
+  attribute tabindex { Number.datatype }?,
+  attribute accesskey { Character.datatype }?,
+  attribute accept { ContentTypes.datatype }?
+# end of input.attlist
+
+# select: Option Selector ...........................
+select.content = (optgroup | option)+
+select = element select { select.attlist, select.content }
+# end of select.element
+select.attlist &=
+  Common.attrib,
+  attribute name { text }?,
+  attribute size { Number.datatype }?,
+  attribute multiple { "multiple" }?,
+  attribute disabled { "disabled" }?,
+  attribute tabindex { Number.datatype }?
+# end of select.attlist
+
+# optgroup: Option Group ............................
+optgroup.content = option+
+optgroup = element optgroup { optgroup.attlist, optgroup.content }
+# end of optgroup.element
+optgroup.attlist &=
+  Common.attrib,
+  attribute disabled { "disabled" }?,
+  attribute label { Text.datatype }
+# end of optgroup.attlist
+
+# option: Selectable Choice .........................
+option.content = text
+option = element option { option.attlist, option.content }
+# end of option.element
+option.attlist &=
+  Common.attrib,
+  attribute selected { "selected" }?,
+  attribute disabled { "disabled" }?,
+  attribute label { Text.datatype }?,
+  attribute value { text }?
+# end of option.attlist
+
+# textarea: Multi-Line Text Field ...................
+textarea.content = text
+textarea = element textarea { textarea.attlist, textarea.content }
+# end of textarea.element
+textarea.attlist &=
+  Common.attrib,
+  attribute name { text }?,
+  attribute rows { Number.datatype },
+  attribute cols { Number.datatype },
+  attribute disabled { "disabled" }?,
+  attribute readonly { "readonly" }?,
+  attribute tabindex { Number.datatype }?,
+  attribute accesskey { Character.datatype }?
+# end of textarea.attlist
+
+# fieldset: Form Control Group ......................
+
+# #PCDATA is to solve the mixed content problem,
+# per specification only whitespace is allowed
+fieldset.content = (text | legend | Flow.mix)*
+fieldset = element fieldset { fieldset.attlist, fieldset.content }
+# end of fieldset.element
+fieldset.attlist &= Common.attrib
+# end of fieldset.attlist
+
+# legend: Fieldset Legend ...........................
+legend.content = (text | Inline.mix)*
+legend = element legend { legend.attlist, legend.content }
+# end of legend.element
+legend.attlist &=
+  Common.attrib,
+  attribute accesskey { Character.datatype }?
+# end of legend.attlist
+
+# button: Push Button ...............................
+button.content =
+  (text
+   | BlkNoForm.mix
+   | InlStruct.class
+   | InlPhras.class
+   | InlPres.class
+   | I18n.class
+   | InlSpecial.class
+   | Inline.extra)*
+button = element button { button.attlist, button.content }
+# end of button.element
+button.attlist &=
+  Common.attrib,
+  attribute name { text }?,
+  attribute value { text }?,
+  [ a:defaultValue = "submit" ]
+  attribute type { "button" | "submit" | "reset" }?,
+  attribute disabled { "disabled" }?,
+  attribute tabindex { Number.datatype }?,
+  attribute accesskey { Character.datatype }?
+# end of button.attlist
+
+# end of xhtml-form-1.mod

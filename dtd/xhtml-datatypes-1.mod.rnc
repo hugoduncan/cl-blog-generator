@@ -1,0 +1,74 @@
+# ......................................................................
+
+# XHTML Datatypes Module  ..............................................
+
+# file: xhtml-datatypes-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-datatypes-1.mod,v 4.1 2001/04/06 19:23:32 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ENTITIES XHTML Datatypes 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-datatypes-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Datatypes
+# 
+# defines containers for the following datatypes, many of
+# these imported from other specifications and standards.
+
+# Length defined for cellpadding/cellspacing
+
+# nn for pixels or nn% for percentage length
+
+Length.datatype = string
+# space-separated list of link types
+LinkTypes.datatype = xsd:NMTOKENS
+# single or comma-separated list of media descriptors
+MediaDesc.datatype = string
+# pixel, percentage, or relative
+MultiLength.datatype = string
+# one or more digits (NUMBER)
+Number.datatype = string
+# integer representing length in pixels
+Pixels.datatype = string
+# script expression
+
+# textual content
+Text.datatype = string
+# Placeholder Compact URI-related types
+
+# Imported Datatypes ................................
+
+# a single character from [ISO10646]
+Character.datatype = string
+# a character encoding, as per [RFC2045]
+Charset.datatype = string
+# a space separated list of character encodings, as per [RFC2045]
+Charsets.datatype = string
+# Color specification using color name or sRGB (#RRGGBB) values
+
+# media type, as per [RFC2045]
+ContentType.datatype = string
+# comma-separated list of media types, as per [RFC2045]
+ContentTypes.datatype = string
+# date and time information. ISO date format
+Datetime.datatype = string
+# formal public identifier, as per [ISO8879]
+FPI.datatype = string
+# a language code, as per [RFC3066] or its successor
+LanguageCode.datatype = string
+# a comma separated list of language code ranges
+
+# a qualified name , as per [XMLNS] or its successor
+
+# a Uniform Resource Identifier, see [URI]
+URI.datatype = string
+# a space-separated list of Uniform Resource Identifiers, see [URI]
+URIs.datatype = string
+# end of xhtml-datatypes-1.mod

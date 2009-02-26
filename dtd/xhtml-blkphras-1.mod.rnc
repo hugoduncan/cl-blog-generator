@@ -1,0 +1,86 @@
+# ......................................................................
+
+# XHTML Block Phrasal Module  ..........................................
+
+# file: xhtml-blkphras-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-blkphras-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Block Phrasal 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-blkphras-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Block Phrasal
+# 
+#    address, blockquote, pre, h1, h2, h3, h4, h5, h6
+# 
+# This module declares the elements and their attributes used to
+# support block-level phrasal markup.
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+address.content = (text | Inline.mix)*
+address = element address { address.attlist, address.content }
+# end of address.element
+address.attlist &= Common.attrib
+# end of address.attlist
+blockquote.content = Block.mix*
+blockquote =
+  element blockquote { blockquote.attlist, blockquote.content }
+# end of blockquote.element
+blockquote.attlist &=
+  Common.attrib,
+  attribute cite { URI.datatype }?
+# end of blockquote.attlist
+pre.content =
+  (text
+   | InlStruct.class
+   | InlPhras.class
+   | tt
+   | i
+   | b
+   | I18n.class
+   | Anchor.class
+   | map
+   | Misc.class
+   | Inline.extra)*
+pre = element pre { pre.attlist, pre.content }
+# end of pre.element
+pre.attlist &= Common.attrib
+# end of pre.attlist
+
+# ...................  Heading Elements  ...................
+Heading.content = (text | Inline.mix)*
+h1 = element h1 { h1.attlist, Heading.content }
+# end of h1.element
+h1.attlist &= Common.attrib
+# end of h1.attlist
+h2 = element h2 { h2.attlist, Heading.content }
+# end of h2.element
+h2.attlist &= Common.attrib
+# end of h2.attlist
+h3 = element h3 { h3.attlist, Heading.content }
+# end of h3.element
+h3.attlist &= Common.attrib
+# end of h3.attlist
+h4 = element h4 { h4.attlist, Heading.content }
+# end of h4.element
+h4.attlist &= Common.attrib
+# end of h4.attlist
+h5 = element h5 { h5.attlist, Heading.content }
+# end of h5.element
+h5.attlist &= Common.attrib
+# end of h5.attlist
+h6 = element h6 { h6.attlist, Heading.content }
+# end of h6.element
+h6.attlist &= Common.attrib
+# end of h6.attlist
+
+# end of xhtml-blkphras-1.mod

@@ -1,0 +1,87 @@
+# ......................................................................
+
+# XHTML Inline Phrasal Module  .........................................
+
+# file: xhtml-inlphras-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-inlphras-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Inline Phrasal 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-inlphras-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Inline Phrasal
+# 
+#    abbr, acronym, cite, code, dfn, em, kbd, q, samp, strong, var
+# 
+# This module declares the elements and their attributes used to
+# support inline-level phrasal markup.
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+abbr.content = (text | Inline.mix)*
+abbr = element abbr { abbr.attlist, abbr.content }
+# end of abbr.element
+abbr.attlist &= Common.attrib
+# end of abbr.attlist
+acronym.content = (text | Inline.mix)*
+acronym = element acronym { acronym.attlist, acronym.content }
+# end of acronym.element
+acronym.attlist &= Common.attrib
+# end of acronym.attlist
+cite.content = (text | Inline.mix)*
+cite = element cite { cite.attlist, cite.content }
+# end of cite.element
+cite.attlist &= Common.attrib
+# end of cite.attlist
+code.content = (text | Inline.mix)*
+code = element code { code.attlist, code.content }
+# end of code.element
+code.attlist &= Common.attrib
+# end of code.attlist
+dfn.content = (text | Inline.mix)*
+dfn = element dfn { dfn.attlist, dfn.content }
+# end of dfn.element
+dfn.attlist &= Common.attrib
+# end of dfn.attlist
+em.content = (text | Inline.mix)*
+em = element em { em.attlist, em.content }
+# end of em.element
+em.attlist &= Common.attrib
+# end of em.attlist
+kbd.content = (text | Inline.mix)*
+kbd = element kbd { kbd.attlist, kbd.content }
+# end of kbd.element
+kbd.attlist &= Common.attrib
+# end of kbd.attlist
+q.content = (text | Inline.mix)*
+q = element q { q.attlist, q.content }
+# end of q.element
+q.attlist &=
+  Common.attrib,
+  attribute cite { URI.datatype }?
+# end of q.attlist
+samp.content = (text | Inline.mix)*
+samp = element samp { samp.attlist, samp.content }
+# end of samp.element
+samp.attlist &= Common.attrib
+# end of samp.attlist
+strong.content = (text | Inline.mix)*
+strong = element strong { strong.attlist, strong.content }
+# end of strong.element
+strong.attlist &= Common.attrib
+# end of strong.attlist
+var.content = (text | Inline.mix)*
+var = element var { var.attlist, var.content }
+# end of var.element
+var.attlist &= Common.attrib
+# end of var.attlist
+
+# end of xhtml-inlphras-1.mod

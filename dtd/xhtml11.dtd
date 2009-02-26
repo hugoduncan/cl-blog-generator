@@ -1,0 +1,46 @@
+
+<!-- Bring in the XHTML datatypes -->
+<!ENTITY % xhtml-datatypes.mod
+     PUBLIC "-//W3C//ENTITIES XHTML Datatypes 1.0//EN"
+            "http://www.w3.org/MarkUp/DTD/xhtml-datatypes-1.mod" >
+%xhtml-datatypes.mod;
+
+
+<!-- Qualified names for our module -->
+
+<!ENTITY % NS.prefixed "IGNORE" >
+<!ENTITY % Post.prefixed "%NS.prefixed;" >
+
+<!-- Declare the actual namespace of this module -->
+<!ENTITY % Post.xmlns "http://hugoduncan.org/xmlns/post" >
+
+<!-- Declare the default prefix for this module -->
+<!ENTITY % Post.prefix "post" >
+
+<!-- Declare the prefix for this module -->
+<![%Post.prefixed;[
+<!ENTITY % Post.pfx "%Post.prefix;:" >
+]]>
+<!ENTITY % Post.pfx "" >
+
+<!-- Declare the xml namespace attribute for this module -->
+<![%Post.prefixed;[
+<!ENTITY % Post.xmlns.extra.attrib
+    "xmlns:%Post.prefix;   %URI.datatype;  #FIXED  '%Post.xmlns;'" >
+]]>
+<!ENTITY % Post.xmlns.extra.attrib "" >
+
+<!-- Declare the extra namespace that should be included in the XHTML
+     elements -->
+<!ENTITY % XHTML.xmlns.extra.attrib
+    "%Post.xmlns.extra.attrib;" >
+
+<!-- Define the Content Model for the framework to use -->
+<!ENTITY % xhtml-model.mod
+     SYSTEM "post-model-1.mod" >
+
+<!-- let the framework do its thing -->
+<!ENTITY % xhtml11.dtd
+     PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+         "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd" >
+%xhtml11.dtd;

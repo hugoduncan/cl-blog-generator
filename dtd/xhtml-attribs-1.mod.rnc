@@ -1,0 +1,53 @@
+# ......................................................................
+
+# XHTML Common Attributes Module  ......................................
+
+# file: xhtml-attribs-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-attribs-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ENTITIES XHTML Common Attributes 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-attribs-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Common Attributes
+# 
+# This module declares many of the common attributes for the XHTML DTD.
+# %NS.decl.attrib; is declared in the XHTML Qname module.
+# 
+#     Note that this file was extended in XHTML Modularization 1.1 to 
+#     include declarations of "global" versions of the attribute collections.
+#     The global versions of the attributes are for use on elements in other 
+#     namespaces.  The global version of "common" includes the xmlns declaration
+#     for the prefixed version of the xhtml namespace.  If you are only using a
+#     specific attribute or an individual attribute collection, you must also
+#     include the XHTML.xmlns.attrib.prefixed PE on your elements.
+
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+id.attrib = attribute id { xsd:ID }?
+class.attrib = attribute class { xsd:NMTOKENS }?
+title.attrib = attribute title { Text.datatype }?
+Core.extra.attrib = empty
+Core.attrib =
+  XHTML.xmlns.attrib,
+  id.attrib,
+  class.attrib,
+  title.attrib,
+  [ a:defaultValue = "preserve" ] attribute xml:space { "preserve" }?,
+  Core.extra.attrib
+lang.attrib = attribute xml:lang { LanguageCode.datatype }?
+I18n.attrib = lang.attrib
+Common.extra.attrib = empty
+# intrinsic event attributes declared previously
+Events.attrib = empty
+Common.attrib =
+  Core.attrib, I18n.attrib, Events.attrib, Common.extra.attrib
+# end of xhtml-attribs-1.mod

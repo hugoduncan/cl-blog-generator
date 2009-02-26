@@ -1,0 +1,27 @@
+# Qualified names for our module
+
+# Declare the actual namespace of this module
+
+# Declare the default prefix for this module
+
+# If this module's namespace is prefixed
+
+# This entity is ALWAYS prefixed, for use when adding our
+# attributes to an element in another namespace
+
+Post.xmlns.attrib.prefixed = empty
+# Declare a Parameter Entity (PE) that defines any external namespaces
+# that are used by this module
+Post.xmlns.extra.attrib = empty
+# If we want to use xhtml namespace attributes on our elements, then
+# we need a prefix for them; default to xhtml.
+
+# Declare a PE that defines the xmlns attributes for use by Post.
+
+# if we are not prefixed, then our elements should have the default
+# namespace AND the prefixed namespace is added to the XHTML set
+# because our attributes can be referenced on those elements
+Post.xmlns.attrib = Post.xmlns.extra.attrib
+XHTML.xmlns.extra.attrib = Post.xmlns.attrib.prefixed
+# Now declare the qualified names for all of the elements in the
+# module

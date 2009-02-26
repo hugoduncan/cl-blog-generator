@@ -1,0 +1,50 @@
+# ......................................................................
+
+# XHTML Editing Elements Module  .......................................
+
+# file: xhtml-edit-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-edit-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Editing Markup 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-edit-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Editing Elements
+# 
+#    ins, del
+# 
+# This module declares element types and attributes used to indicate
+# inserted and deleted content while editing a document.
+
+# ins: Inserted Text  ...............................
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+ins.content = (text | Flow.mix)*
+ins = element ins { ins.attlist, ins.content }
+# end of ins.element
+ins.attlist &=
+  Common.attrib,
+  attribute cite { URI.datatype }?,
+  attribute datetime { Datetime.datatype }?
+# end of ins.attlist
+
+# del: Deleted Text  ................................
+del.content = (text | Flow.mix)*
+del = element del { del.attlist, del.content }
+# end of del.element
+del.attlist &=
+  Common.attrib,
+  attribute cite { URI.datatype }?,
+  attribute datetime { Datetime.datatype }?
+# end of del.attlist
+
+# end of xhtml-edit-1.mod

@@ -1,0 +1,146 @@
+# .......................................................................
+
+# XHTML 1.1 DTD  ........................................................
+
+# file: xhtml11.dtd
+
+# XHTML 1.1 DTD
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# 
+# The Extensible HyperText Markup Language (XHTML)
+# Copyright 1998-2007 World Wide Web Consortium
+#    (Massachusetts Institute of Technology, European Research Consortium
+#     for Informatics and Mathematics, Keio University).
+#     All Rights Reserved.
+# 
+# Permission to use, copy, modify and distribute the XHTML DTD and its 
+# accompanying documentation for any purpose and without fee is hereby 
+# granted in perpetuity, provided that the above copyright notice and 
+# this paragraph appear in all copies.  The copyright holders make no 
+# representation about the suitability of the DTD for any purpose.
+# 
+# It is provided "as is" without expressed or implied warranty.
+# 
+#    Author:     Murray M. Altheim <altheim@eng.sun.com>
+#    Revision:   $Id: xhtml11.dtd,v 1.1 2007/02/15 23:14:56 jean-gui Exp $
+#
+
+# This is the driver file for version 1.1 of the XHTML DTD.
+# 
+# Please use this public identifier to identify it:
+# 
+#     "-//W3C//DTD XHTML 1.1//EN"
+
+# Use this URI to identify the default namespace:
+# 
+#     "http://www.w3.org/1999/xhtml"
+# 
+# See the Qualified Names module for information
+# on the use of namespace prefixes in the DTD.
+# 
+#     Note that XHTML namespace elements are not prefixed by default,
+#     but the XHTML namespace prefix is defined as "xhtml" so that
+#     other markup languages can extend this one and use the XHTML
+#     prefixed global attributes if required.
+#
+
+# Be sure to include prefixed global attributes - we don't need
+# them, but languages that extend XHTML 1.1 might.
+
+# Reserved for use with the XLink namespace:
+
+namespace ns1 = "http://www.w3.org/1999/xhtml"
+
+XLINK.xmlns.attrib = empty
+# For example, if you are using XHTML 1.1 directly, use the public
+# identifier in the DOCTYPE declaration, with the namespace declaration
+# on the document element to identify the default namespace:
+# 
+#   <?xml version="1.0"?>
+#   <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN"
+#                         "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+#   <html xmlns="http://www.w3.org/1999/xhtml"
+#         xml:lang="en">
+#   ...
+#   </html>
+# 
+# Revisions:
+# (none)
+
+# reserved for future use with document profiles
+
+# ensure XHTML Notations are disabled
+
+# Bidirectional Text features
+# This feature-test entity is used to declare elements
+# and attributes used for bidirectional text support.
+
+# :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Pre-Framework Redeclaration placeholder  ....................
+
+# this serves as a location to insert markup declarations
+# into the DTD prior to the framework declarations.
+
+# Inline Style Module  ........................................
+include "xhtml-inlstyle-1.mod.rnc" inherit = ns1
+# declare Document Model module instantiated in framework
+
+# Modular Framework Module (required) .........................
+include "xhtml-framework-1.mod.rnc" inherit = ns1
+# Post-Framework Redeclaration placeholder  ...................
+
+# this serves as a location to insert markup declarations
+# into the DTD following the framework declarations.
+
+# Text Module (Required)  .....................................
+include "xhtml-text-1.mod.rnc" inherit = ns1
+# Hypertext Module (required) .................................
+include "xhtml-hypertext-1.mod.rnc" inherit = ns1
+# Lists Module (required)  ....................................
+include "xhtml-list-1.mod.rnc" inherit = ns1
+# :::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+
+# Edit Module  ................................................
+include "xhtml-edit-1.mod.rnc" inherit = ns1
+# BIDI Override Module  .......................................
+include "xhtml-bdo-1.mod.rnc" inherit = ns1
+# Ruby Module  ................................................
+Ruby.common.attrib = Common.attrib
+include "xhtml-ruby-1.mod.rnc" inherit = ns1
+# Presentation Module  ........................................
+include "xhtml-pres-1.mod.rnc" inherit = ns1
+# Link Element Module  ........................................
+include "xhtml-link-1.mod.rnc" inherit = ns1
+# Document Metainformation Module  ............................
+include "xhtml-meta-1.mod.rnc" inherit = ns1
+# Base Element Module  ........................................
+include "xhtml-base-1.mod.rnc" inherit = ns1
+# Scripting Module  ...........................................
+include "xhtml-script-1.mod.rnc" inherit = ns1
+# Style Sheets Module  .........................................
+include "xhtml-style-1.mod.rnc" inherit = ns1
+# Image Module  ...............................................
+include "xhtml-image-1.mod.rnc" inherit = ns1
+# Client-side Image Map Module  ...............................
+include "xhtml-csismap-1.mod.rnc" inherit = ns1
+# Server-side Image Map Module  ...............................
+include "xhtml-ssismap-1.mod.rnc" inherit = ns1
+# Param Element Module  .......................................
+include "xhtml-param-1.mod.rnc" inherit = ns1
+# Embedded Object Module  .....................................
+include "xhtml-object-1.mod.rnc" inherit = ns1
+# Tables Module ...............................................
+include "xhtml-table-1.mod.rnc" inherit = ns1
+# Forms Module  ...............................................
+include "xhtml-form-1.mod.rnc" inherit = ns1
+# Target Attribute Module  ....................................
+include "xhtml-target-1.mod.rnc" inherit = ns1
+# Legacy Markup ...............................................
+
+# Document Structure Module (required)  .......................
+include "xhtml-struct-1.mod.rnc" inherit = ns1
+# end of XHTML 1.1 DTD  .................................................
+
+# .......................................................................

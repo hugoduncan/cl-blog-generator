@@ -1,0 +1,54 @@
+# ......................................................................
+
+# XHTML Embedded Object Module  ........................................
+
+# file: xhtml-object-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-object-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Embedded Object 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-object-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Embedded Objects
+# 
+#    object
+# 
+# This module declares the object element type and its attributes, used
+# to embed external objects as part of XHTML pages. In the document,
+# place param elements prior to other content within the object element.
+# 
+# Note that use of this module requires instantiation of the Param
+# Element Module.
+
+# object: Generic Embedded Object ...................
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+object.content = (text | Flow.mix | param)*
+object = element object { object.attlist, object.content }
+# end of object.element
+object.attlist &=
+  Common.attrib,
+  attribute declare { "declare" }?,
+  attribute classid { URI.datatype }?,
+  attribute codebase { URI.datatype }?,
+  attribute data { URI.datatype }?,
+  attribute type { ContentType.datatype }?,
+  attribute codetype { ContentType.datatype }?,
+  attribute archive { URIs.datatype }?,
+  attribute standby { Text.datatype }?,
+  attribute height { Length.datatype }?,
+  attribute width { Length.datatype }?,
+  attribute name { text }?,
+  attribute tabindex { Number.datatype }?
+# end of object.attlist
+
+# end of xhtml-object-1.mod

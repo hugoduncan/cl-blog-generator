@@ -1,0 +1,141 @@
+# ......................................................................
+
+# XHTML Ruby Module ....................................................
+
+# file: xhtml-ruby-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1999-2001 W3C (MIT, INRIA, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-ruby-1.mod,v 4.0 2001/04/03 23:14:33 altheim Exp $
+# 
+# This module is based on the W3C Ruby Annotation Specification:
+# 
+#    http://www.w3.org/TR/ruby
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Ruby 1.0//EN"
+#   SYSTEM "http://www.w3.org/TR/ruby/xhtml-ruby-1.mod"
+# 
+# ......................................................................
+
+# Ruby Elements
+# 
+#    ruby, rbc, rtc, rb, rt, rp
+# 
+# This module declares the elements and their attributes used to
+# support ruby annotation markup.
+
+# declare qualified element type names:
+
+# rp fallback is included by default.
+
+# Complex ruby is included by default; it may be 
+# overridden by other modules to ignore it.
+
+# Fragments for the content model of the ruby element
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+Ruby.content.simple =
+  rb,
+  (rt | (rp, rt, rp))
+Ruby.content.complex = rbc, rtc, rtc?
+# Content models of the rb and the rt elements are intended to
+# allow other inline-level elements of its parent markup language,
+# but it should not include ruby descendent elements. The following
+# parameter entity %NoRuby.content; can be used to redefine
+# those content models with minimum effort.  It's defined as
+# '( #PCDATA )' by default.
+
+# one or more digits (NUMBER)
+
+# ruby element ......................................
+ruby.content = Ruby.content.simple | Ruby.content.complex
+ruby = element ruby { ruby.attlist, ruby.content }
+# end of ruby.element
+
+# rbc (ruby base component) element .................
+rbc.content = rb+
+rbc = element rbc { rbc.attlist, rbc.content }
+# end of rbc.element
+
+# rtc (ruby text component) element .................
+rtc.content = rt+
+rtc = element rtc { rtc.attlist, rtc.content }
+# end of rtc.element
+
+# rb (ruby base) element ............................
+
+# %rb.content; uses %NoRuby.content; as its content model,
+# which is '( #PCDATA )' by default. It may be overridden
+# by other modules to allow other inline-level elements
+# of its parent markup language, but it should not include
+# ruby descendent elements.
+rb.content = NoRuby.content
+rb = element rb { rb.attlist, rb.content }
+# end of rb.element
+
+# rt (ruby text) element ............................
+
+# %rt.content; uses %NoRuby.content; as its content model,
+# which is '( #PCDATA )' by default. It may be overridden
+# by other modules to allow other inline-level elements
+# of its parent markup language, but it should not include
+# ruby descendent elements.
+rt.content = NoRuby.content
+rt = element rt { rt.attlist, rt.content }
+# end of rt.element
+
+# rbspan attribute is used for complex ruby only ......
+rt.attlist &=
+  [ a:defaultValue = "1" ] attribute rbspan { Number.datatype }?
+# end of rt.attlist
+
+# rp (ruby parenthesis) element .....................
+rp.content = text
+rp = element rp { rp.attlist, rp.content }
+# end of rp.element
+
+# Ruby Common Attributes
+# 
+# The following optional ATTLIST declarations provide an easy way
+# to define common attributes for ruby elements.  These declarations
+# are ignored by default.
+# 
+# Ruby elements are intended to have common attributes of its
+# parent markup language.  For example, if a markup language defines
+# common attributes as a parameter entity %attrs;, you may add
+# those attributes by just declaring the following parameter entities
+# 
+#     <!ENTITY % Ruby.common.attlists  "INCLUDE" >
+#     <!ENTITY % Ruby.common.attrib  "%attrs;" >
+# 
+# before including the Ruby module.
+
+# common attributes for ruby ........................
+ruby.attlist &= Ruby.common.attrib
+# end of Ruby.common.attlist
+
+# common attributes for rbc .........................
+rbc.attlist &= Ruby.common.attrib
+# end of Rbc.common.attlist
+
+# common attributes for rtc .........................
+rtc.attlist &= Ruby.common.attrib
+# end of Rtc.common.attlist
+
+# common attributes for rb ..........................
+rb.attlist &= Ruby.common.attrib
+# end of Rb.common.attlist
+
+# common attributes for rt ..........................
+rt.attlist &= Ruby.common.attrib
+# end of Rt.common.attlist
+
+# common attributes for rp ..........................
+rp.attlist &= Ruby.common.attrib
+# end of Rp.common.attlist
+
+# end of xhtml-ruby-1.mod

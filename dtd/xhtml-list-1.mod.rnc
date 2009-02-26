@@ -1,0 +1,72 @@
+# ......................................................................
+
+# XHTML Lists Module  ..................................................
+
+# file: xhtml-list-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-list-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Lists 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-list-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Lists
+# 
+#    dl, dt, dd, ol, ul, li
+# 
+# This module declares the list-oriented element types
+# and their attributes.
+
+# dl: Definition List ...............................
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+dl.content = (dt | dd)+
+dl = element dl { dl.attlist, dl.content }
+# end of dl.element
+dl.attlist &= Common.attrib
+# end of dl.attlist
+
+# dt: Definition Term ...............................
+dt.content = (text | Inline.mix)*
+dt = element dt { dt.attlist, dt.content }
+# end of dt.element
+dt.attlist &= Common.attrib
+# end of dt.attlist
+
+# dd: Definition Description ........................
+dd.content = (text | Flow.mix)*
+dd = element dd { dd.attlist, dd.content }
+# end of dd.element
+dd.attlist &= Common.attrib
+# end of dd.attlist
+
+# ol: Ordered List (numbered styles) ................
+ol.content = li+
+ol = element ol { ol.attlist, ol.content }
+# end of ol.element
+ol.attlist &= Common.attrib
+# end of ol.attlist
+
+# ul: Unordered List (bullet styles) ................
+ul.content = li+
+ul = element ul { ul.attlist, ul.content }
+# end of ul.element
+ul.attlist &= Common.attrib
+# end of ul.attlist
+
+# li: List Item .....................................
+li.content = (text | Flow.mix)*
+li = element li { li.attlist, li.content }
+# end of li.element
+li.attlist &= Common.attrib
+# end of li.attlist
+
+# end of xhtml-list-1.mod

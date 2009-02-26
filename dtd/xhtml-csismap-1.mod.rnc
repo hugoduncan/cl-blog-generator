@@ -1,0 +1,84 @@
+# ......................................................................
+
+# XHTML Client-side Image Map Module  ..................................
+
+# file: xhtml-csismap-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-csismap-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Client-side Image Maps 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-csismap-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Client-side Image Maps
+# 
+#    area, map
+# 
+# This module declares elements and attributes to support client-side
+# image maps. This requires that the Image Module (or a module
+# declaring the img element type) be included in the DTD.
+# 
+# These can be placed in the same document or grouped in a
+# separate document, although the latter isn't widely supported
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+area.content = empty
+area = element area { area.attlist, area.content }
+# end of area.element
+Shape.datatype = "rect" | "circle" | "poly" | "default"
+Coords.datatype = string
+area.attlist &=
+  Common.attrib,
+  attribute href { URI.datatype }?,
+  [ a:defaultValue = "rect" ] attribute shape { Shape.datatype }?,
+  attribute coords { Coords.datatype }?,
+  attribute nohref { "nohref" }?,
+  attribute alt { Text.datatype },
+  attribute tabindex { Number.datatype }?,
+  attribute accesskey { Character.datatype }?
+# end of area.attlist
+
+# modify anchor attribute definition list
+# to allow for client-side image maps
+a.attlist &=
+  [ a:defaultValue = "rect" ] attribute shape { Shape.datatype }?,
+  attribute coords { Coords.datatype }?
+# modify img attribute definition list
+# to allow for client-side image maps
+img.attlist &= attribute usemap { xsd:IDREF }?
+# modify form input attribute definition list
+# to allow for client-side image maps
+input.attlist &= attribute usemap { xsd:IDREF }?
+# modify object attribute definition list
+# to allow for client-side image maps
+object.attlist &= attribute usemap { xsd:IDREF }?
+# 'usemap' points to the 'id' attribute of a <map> element,
+# which must be in the same document; support for external
+# document maps was not widely supported in HTML and is
+# eliminated in XHTML.
+# 
+# It is considered an error for the element pointed to by
+# a usemap IDREF to occur in anything but a <map> element.
+map.content = (Block.mix | area)+
+map = element map { map.attlist, map.content }
+# end of map.element
+map.attlist &=
+  XHTML.xmlns.attrib,
+  attribute id { xsd:ID },
+  class.attrib,
+  title.attrib,
+  Core.extra.attrib,
+  I18n.attrib,
+  Events.attrib
+# end of map.attlist
+
+# end of xhtml-csismap-1.mod

@@ -1,0 +1,14 @@
+# Define the elements and attributes of the module
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+
+when = element when { when.attlist, empty }
+when.attlist &=
+  attribute year { text }?,
+  attribute month { text }?,
+  attribute day { text }?,
+  Post.Common.attrib
+tag = element tag { tag.attlist, text }
+tag.attlist &= Post.Common.attrib
+# Model for our module - how our dtd patches into xhtml
+HeadOpts.mix = (script | style | meta | link | object | tag | when)*

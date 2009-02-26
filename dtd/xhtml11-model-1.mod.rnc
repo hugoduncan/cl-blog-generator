@@ -1,0 +1,167 @@
+# .......................................................................
+
+# XHTML 1.1 Document Model Module  ......................................
+
+# file: xhtml11-model-1.mod
+# 
+# This is XHTML 1.1, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2008 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml11-model-1.mod,v 1.16 2008/06/21 18:52:27 ahby Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ENTITIES XHTML 1.1 Document Model 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml11-model-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# XHTML 1.1 Document Model
+# 
+# This module describes the groupings of elements that make up
+# common content models for XHTML elements.
+# 
+# XHTML has three basic content models:
+# 
+#     %Inline.mix;  character-level elements
+#     %Block.mix;   block-like elements, eg., paragraphs and lists
+#     %Flow.mix;    any block or inline elements
+# 
+# Any parameter entities declared in this module may be used
+# to create element content models, but the above three are
+# considered 'global' (insofar as that term applies here).
+# 
+# The reserved word '#PCDATA' (indicating a text string) is now
+# included explicitly with each element declaration that is
+# declared as mixed content, as XML requires that this token
+# occur first in a content model specification.
+
+# Extending the Model
+# 
+# While in some cases this module may need to be rewritten to
+# accommodate changes to the document model, minor extensions
+# may be accomplished by redeclaring any of the three *.extra;
+# parameter entities to contain extension element types as follows:
+# 
+#     %Misc.extra;    whose parent may be any block or
+#                     inline element.
+# 
+#     %Inline.extra;  whose parent may be any inline element.
+# 
+#     %Block.extra;   whose parent may be any block element.
+# 
+# If used, these parameter entities must be an OR-separated
+# list beginning with an OR separator ("|"), eg., "| a | b | c"
+# 
+# All block and inline *.class parameter entities not part
+# of the *struct.class classes begin with "| " to allow for
+# exclusion from mixes.
+
+# ..............  Optional Elements in head  ..................
+
+HeadOpts.mix = (script | style | meta | link | object)*
+# .................  Miscellaneous Elements  ..................
+
+# ins and del are used to denote editing changes
+Edit.class = ins | del
+# script and noscript are used to contain scripts
+# and alternative content
+Script.class = script | noscript
+Misc.extra = notAllowed
+# These elements are neither block nor inline, and can
+# essentially be used anywhere in the document body.
+Misc.class = Edit.class | Script.class | Misc.extra
+# ....................  Inline Elements  ......................
+InlStruct.class = br | span
+InlPhras.class =
+  em
+  | strong
+  | dfn
+  | code
+  | samp
+  | kbd
+  | var
+  | cite
+  | abbr
+  | acronym
+  | q
+InlPres.class = tt | i | b | big | small | sub | sup
+I18n.class = bdo
+Anchor.class = a
+InlSpecial.class = img | map | object
+InlForm.class = input | select | textarea | label | button
+Inline.extra = notAllowed
+Ruby.class = ruby
+# %Inline.class; includes all inline elements,
+# used as a component in mixes
+Inline.class =
+  InlStruct.class
+  | InlPhras.class
+  | InlPres.class
+  | I18n.class
+  | Anchor.class
+  | InlSpecial.class
+  | InlForm.class
+  | Ruby.class
+  | Inline.extra
+# %InlNoRuby.class; includes all inline elements
+# except ruby, used as a component in mixes
+InlNoRuby.class =
+  InlStruct.class
+  | InlPhras.class
+  | InlPres.class
+  | I18n.class
+  | Anchor.class
+  | InlSpecial.class
+  | InlForm.class
+  | Inline.extra
+# %NoRuby.content; includes all inlines except ruby
+NoRuby.content = (text | InlNoRuby.class | Misc.class)*
+# %InlNoAnchor.class; includes all non-anchor inlines,
+# used as a component in mixes
+InlNoAnchor.class =
+  InlStruct.class
+  | InlPhras.class
+  | InlPres.class
+  | I18n.class
+  | InlSpecial.class
+  | InlForm.class
+  | Ruby.class
+  | Inline.extra
+# %InlNoAnchor.mix; includes all non-anchor inlines
+InlNoAnchor.mix = InlNoAnchor.class | Misc.class
+# %Inline.mix; includes all inline elements, including %Misc.class;
+Inline.mix = Inline.class | Misc.class
+# .....................  Block Elements  ......................
+
+# In the HTML 4.0 DTD, heading and list elements were included
+# in the %block; parameter entity. The %Heading.class; and
+# %List.class; parameter entities must now be included explicitly
+# on element declarations where desired.
+Heading.class = h1 | h2 | h3 | h4 | h5 | h6
+List.class = ul | ol | dl
+Table.class = table
+Form.class = form
+Fieldset.class = fieldset
+BlkStruct.class = p | \div
+BlkPhras.class = pre | blockquote | address
+BlkPres.class = hr
+BlkSpecial.class = Table.class | Form.class | Fieldset.class
+Block.extra = notAllowed
+# %Block.class; includes all block elements,
+# used as an component in mixes
+Block.class =
+  BlkStruct.class
+  | BlkPhras.class
+  | BlkPres.class
+  | BlkSpecial.class
+  | Block.extra
+# %Block.mix; includes all block elements plus %Misc.class;
+Block.mix = Heading.class | List.class | Block.class | Misc.class
+# ................  All Content Elements  ..................
+
+# %Flow.mix; includes all text content, block and inline
+Flow.mix =
+  Heading.class | List.class | Block.class | Inline.class | Misc.class
+# end of xhtml11-model-1.mod

@@ -1,0 +1,46 @@
+# ......................................................................
+
+# XHTML Param Element Module  .....................................
+
+# file: xhtml-param-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-param-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Param Element 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-param-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Parameters for Java Applets and Embedded Objects
+# 
+#    param
+# 
+# This module provides declarations for the param element,
+# used to provide named property values for the applet
+# and object elements.
+
+# param: Named Property Value .......................
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+param.content = empty
+param = element param { param.attlist, param.content }
+# end of param.element
+param.attlist &=
+  XHTML.xmlns.attrib,
+  id.attrib,
+  attribute name { text },
+  attribute value { text }?,
+  [ a:defaultValue = "data" ]
+  attribute valuetype { "data" | "ref" | "object" }?,
+  attribute type { ContentType.datatype }?
+# end of param.attlist
+
+# end of xhtml-param-1.mod

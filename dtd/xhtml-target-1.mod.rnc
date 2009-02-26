@@ -1,0 +1,39 @@
+# ......................................................................
+
+# XHTML Target Module  .................................................
+
+# file: xhtml-target-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-target-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Target 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-target-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Target 
+# 
+#    target
+# 
+# This module declares the 'target' attribute used for opening windows
+
+# render in this frame
+
+FrameTarget.datatype = string
+# add 'target' attribute to 'a' element
+a.attlist &= attribute target { FrameTarget.datatype }?
+# add 'target' attribute to 'area' element
+area.attlist &= attribute target { FrameTarget.datatype }?
+# add 'target' attribute to 'link' element
+link.attlist &= attribute target { FrameTarget.datatype }?
+# add 'target' attribute to 'form' element
+form.attlist &= attribute target { FrameTarget.datatype }?
+# add 'target' attribute to 'base' element
+base.attlist &= attribute target { FrameTarget.datatype }?
+# end of xhtml-target-1.mod

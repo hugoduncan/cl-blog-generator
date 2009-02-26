@@ -1,0 +1,89 @@
+# ......................................................................
+
+# XHTML Structure Module  ..............................................
+
+# file: xhtml-struct-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-struct-1.mod,v 4.0 2001/04/02 22:42:49 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Document Structure 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-struct-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Document Structure
+# 
+#    title, head, body, html
+# 
+# The Structure Module defines the major structural elements and
+# their attributes.
+# 
+# Note that the content model of the head element type is redeclared
+# when the Base Module is included in the DTD.
+# 
+# The parameter entity containing the XML namespace URI value used
+# for XHTML is '%XHTML.xmlns;', defined in the Qualified Names module.
+
+# title: Document Title .............................
+
+# The title element is not considered part of the flow of text.
+# It should be displayed, for example as the page header or
+# window title. Exactly one title is required per document.
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+namespace xsi = "http://www.w3.org/2001/XMLSchema-instance"
+
+title.content = text
+title = element title { title.attlist, title.content }
+# end of title.element
+title.attlist &= XHTML.xmlns.attrib, I18n.attrib
+# end of title.attlist
+
+# head: Document Head ...............................
+head = element head { head.attlist, head.content }
+# end of head.element
+
+# reserved for future use with document profiles
+profile.attrib =
+  [ a:defaultValue = "" ] attribute profile { URI.datatype }?
+head.attlist &=
+  XHTML.xmlns.attrib, I18n.attrib, profile.attrib, id.attrib
+# end of head.attlist
+
+# body: Document Body ...............................
+body.content = Block.mix*
+body = element body { body.attlist, body.content }
+# end of body.element
+body.attlist &= Common.attrib
+# end of body.attlist
+
+# html: XHTML Document Element ......................
+html.content = head, body
+html = element html { html.attlist, html.content }
+# end of html.element
+
+# define a parameter for the XSI schemaLocation attribute
+XSI.schemaLocation.attrib =
+  attribute xsi:schemaLocation { URIs.datatype }?
+# version attribute value defined in driver
+XHTML.version.attrib =
+  [ a:defaultValue = "-//HUGO DUNCAN//DTD XHTML POST 1.0//EN" ]
+  attribute version { string "-//HUGO DUNCAN//DTD XHTML POST 1.0//EN" }?
+# see the Qualified Names module for information
+# on how to extend XHTML using XML namespaces
+html.attlist &=
+  XHTML.xmlns.attrib,
+  XSI.schemaLocation.attrib,
+  XHTML.version.attrib,
+  I18n.attrib,
+  id.attrib
+# end of html.attlist
+
+# end of xhtml-struct-1.mod

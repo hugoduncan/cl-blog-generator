@@ -1,0 +1,205 @@
+# ......................................................................
+
+# XHTML Table Module  ..................................................
+
+# file: xhtml-table-1.mod
+# 
+# This is XHTML, a reformulation of HTML as a modular XML application.
+# Copyright 1998-2005 W3C (MIT, ERCIM, Keio), All Rights Reserved.
+# Revision: $Id: xhtml-table-1.mod,v 4.1 2001/04/10 09:42:30 altheim Exp $ SMI
+# 
+# This DTD module is identified by the PUBLIC and SYSTEM identifiers:
+# 
+#   PUBLIC "-//W3C//ELEMENTS XHTML Tables 1.0//EN"
+#   SYSTEM "http://www.w3.org/MarkUp/DTD/xhtml-table-1.mod"
+# 
+# Revisions:
+# (none)
+# .......................................................................
+
+# Tables
+# 
+#    table, caption, thead, tfoot, tbody, colgroup, col, tr, th, td
+# 
+# This module declares element types and attributes used to provide
+# table markup similar to HTML 4, including features that enable
+# better accessibility for non-visual user agents.
+
+# declare qualified element type names:
+
+# The frame attribute specifies which parts of the frame around
+# the table should be rendered. The values are not the same as
+# CALS to avoid a name clash with the valign attribute.
+
+default namespace = "http://hugoduncan.org/xmlns/post"
+namespace a = "http://relaxng.org/ns/compatibility/annotations/1.0"
+
+frame.attrib =
+  attribute frame {
+    "void"
+    | "above"
+    | "below"
+    | "hsides"
+    | "lhs"
+    | "rhs"
+    | "vsides"
+    | "box"
+    | "border"
+  }?
+# The rules attribute defines which rules to draw between cells:
+# 
+# If rules is absent then assume:
+# 
+#   "none" if border is absent or border="0" otherwise "all"
+rules.attrib =
+  attribute rules { "none" | "groups" | "rows" | "cols" | "all" }?
+# horizontal alignment attributes for cell contents
+CellHAlign.attrib =
+  attribute align { "left" | "center" | "right" | "justify" | "char" }?,
+  attribute char { Character.datatype }?,
+  attribute charoff { Length.datatype }?
+# vertical alignment attribute for cell contents
+CellVAlign.attrib =
+  attribute valign { "top" | "middle" | "bottom" | "baseline" }?
+# scope is simpler than axes attribute for common tables
+scope.attrib =
+  attribute scope { "row" | "col" | "rowgroup" | "colgroup" }?
+# table: Table Element ..............................
+table.content =
+  caption?,
+  (col* | colgroup*),
+  ((thead?, tfoot?, tbody+) | tr+)
+table = element table { table.attlist, table.content }
+# end of table.element
+table.attlist &=
+  Common.attrib,
+  attribute summary { Text.datatype }?,
+  attribute width { Length.datatype }?,
+  attribute border { Pixels.datatype }?,
+  frame.attrib,
+  rules.attrib,
+  attribute cellspacing { Length.datatype }?,
+  attribute cellpadding { Length.datatype }?
+# end of table.attlist
+
+# caption: Table Caption ............................
+caption.content = (text | Inline.mix)*
+caption = element caption { caption.attlist, caption.content }
+# end of caption.element
+caption.attlist &= Common.attrib
+# end of caption.attlist
+
+# thead: Table Header ...............................
+
+# Use thead to duplicate headers when breaking table
+# across page boundaries, or for static headers when
+# tbody sections are rendered in scrolling panel.
+thead.content = tr+
+thead = element thead { thead.attlist, thead.content }
+# end of thead.element
+thead.attlist &= Common.attrib, CellHAlign.attrib, CellVAlign.attrib
+# end of thead.attlist
+
+# tfoot: Table Footer ...............................
+
+# Use tfoot to duplicate footers when breaking table
+# across page boundaries, or for static footers when
+# tbody sections are rendered in scrolling panel.
+tfoot.content = tr+
+tfoot = element tfoot { tfoot.attlist, tfoot.content }
+# end of tfoot.element
+tfoot.attlist &= Common.attrib, CellHAlign.attrib, CellVAlign.attrib
+# end of tfoot.attlist
+
+# tbody: Table Body .................................
+
+# Use multiple tbody sections when rules are needed
+# between groups of table rows.
+tbody.content = tr+
+tbody = element tbody { tbody.attlist, tbody.content }
+# end of tbody.element
+tbody.attlist &= Common.attrib, CellHAlign.attrib, CellVAlign.attrib
+# end of tbody.attlist
+
+# colgroup: Table Column Group ......................
+
+# colgroup groups a set of col elements. It allows you
+# to group several semantically-related columns together.
+colgroup.content = col*
+colgroup = element colgroup { colgroup.attlist, colgroup.content }
+# end of colgroup.element
+colgroup.attlist &=
+  Common.attrib,
+  [ a:defaultValue = "1" ] attribute span { Number.datatype }?,
+  attribute width { MultiLength.datatype }?,
+  CellHAlign.attrib,
+  CellVAlign.attrib
+# end of colgroup.attlist
+
+# col: Table Column .................................
+
+# col elements define the alignment properties for
+# cells in one or more columns.
+# 
+# The width attribute specifies the width of the
+# columns, e.g.
+# 
+#   width="64"        width in screen pixels
+#   width="0.5*"      relative width of 0.5
+# 
+# The span attribute causes the attributes of one
+# col element to apply to more than one column.
+col.content = empty
+col = element col { col.attlist, col.content }
+# end of col.element
+col.attlist &=
+  Common.attrib,
+  [ a:defaultValue = "1" ] attribute span { Number.datatype }?,
+  attribute width { MultiLength.datatype }?,
+  CellHAlign.attrib,
+  CellVAlign.attrib
+# end of col.attlist
+
+# tr: Table Row .....................................
+tr.content = (th | td)+
+tr = element tr { tr.attlist, tr.content }
+# end of tr.element
+tr.attlist &= Common.attrib, CellHAlign.attrib, CellVAlign.attrib
+# end of tr.attlist
+
+# th: Table Header Cell .............................
+
+# th is for header cells, td for data,
+# but for cells acting as both use td
+th.content = (text | Flow.mix)*
+th = element th { th.attlist, th.content }
+# end of th.element
+th.attlist &=
+  Common.attrib,
+  attribute abbr { Text.datatype }?,
+  attribute axis { text }?,
+  attribute headers { xsd:IDREFS }?,
+  scope.attrib,
+  [ a:defaultValue = "1" ] attribute rowspan { Number.datatype }?,
+  [ a:defaultValue = "1" ] attribute colspan { Number.datatype }?,
+  CellHAlign.attrib,
+  CellVAlign.attrib
+# end of th.attlist
+
+# td: Table Data Cell ...............................
+td.content = (text | Flow.mix)*
+td = element td { td.attlist, td.content }
+# end of td.element
+td.attlist &=
+  Common.attrib,
+  attribute abbr { Text.datatype }?,
+  attribute axis { text }?,
+  attribute headers { xsd:IDREFS }?,
+  scope.attrib,
+  [ a:defaultValue = "1" ] attribute rowspan { Number.datatype }?,
+  [ a:defaultValue = "1" ] attribute colspan { Number.datatype }?,
+  CellHAlign.attrib,
+  CellVAlign.attrib
+# end of td.attlist
+
+# end of xhtml-table-1.mod
