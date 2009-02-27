@@ -39,20 +39,32 @@
 
 (defun blog-gen-execute-and-visit (cmd-string)
   "Eval CMD-STRING in Lisp; assume output is a file name to visit."
-  (slime-eval-async `(swank:eval-and-grab-output ,cmd-string)
-                    (lambda (result)
-                      (destructuring-bind (output value) result
-			(let ((buf (find-file-noselect (substring value 1 -1))))
-			  (when buf
-			    (switch-to-buffer buf)))
-			(save-current-buffer
-			  (set-buffer (get-buffer-create "*Site Publisher*"))
-			  (insert output)
-			  (when (plusp (length output))
-			    (switch-to-buffer-other-window (current-buffer))))))))
+  (slime-eval-async
+   `(swank:eval-and-grab-output ,cmd-string)
+   (lambda (result)
+     (destructuring-bind (output value) result
+       (message "%s %s" (type-of value) value)
+       (let* ((res (read-from-string value))
+	      (published-path (caar res))
+	      (site-path (cadar res)))
+	 (message "Published path is %s" published-path)
+	 (message "Site path is %s" site-path)
+	 (let ((buf (find-file-noselect published-path)))
+	   (when buf
+	     (switch-to-buffer buf)))
+	 (browse-url (format "http://localhost%s" site-path))
+	 (save-current-buffer
+	   (set-buffer (get-buffer-create "*Site Publisher*"))
+	   (insert output)
+	   (when (plusp (length output))
+	     (switch-to-buffer-other-window (current-buffer)))))))))
 
 (defun blog-gen-publish-draft ()
   ;; publish a draft
   (interactive)
   (let ((cmd (format "(cl-blog-generator:publish-draft %S)" (buffer-file-name))))
     (blog-gen-execute-and-visit cmd)))
+
+
+;;;; Initialization
+(provide 'blog-gen)

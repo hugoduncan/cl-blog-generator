@@ -8,18 +8,17 @@
 <link rel="openid.server" href="http://www.myopenid.com/server" />
 <link rel="openid.delegate" href="http://hugoduncan.myopenid.com/" />
 <link rel="meta" type="application/rdf+xml" title="FOAF" href="foaf.rdf" />
-<meta name="keywords" content="boost,c++,cavitation,propeller,artificial intelligence,sematic web"/>
+<meta name="keywords" content="boost,c++,cavitation,propeller,artificial intelligence,sematic web,lisp,common lisp"/>
 <meta name="description" content="Home page for Hugo Duncan, with current projects"/>
 <title>Hugo Duncan : </title>
 </head>
 <body>
-<div id='banner'><h1>Hugo Duncan</h1><div id='search'><form action="http://www.google.com/search"><div>Search <input size="15" name="as_q" /><input type="hidden" name="hl" value="en" /><input type="hidden" name="ie" value="UTF-8" /><input type="hidden" name="btnG" value="Google+Search" /><input type="hidden" name="as_qdr" value="all" /><input type="hidden" name="as_occt" value="any" /><input type="hidden" name="as_dt" value="i" /><input type="hidden" name="as_sitesearch" value="hugoduncan.org" /></div></form></div></div>
+<div id='banner'><h1><span id='post-title'></span></h1><div id='search'><form action="http://www.google.com/search"><div>Search <input size="15" name="as_q" /><input type="hidden" name="hl" value="en" /><input type="hidden" name="ie" value="UTF-8" /><input type="hidden" name="btnG" value="Google+Search" /><input type="hidden" name="as_qdr" value="all" /><input type="hidden" name="as_occt" value="any" /><input type="hidden" name="as_dt" value="i" /><input type="hidden" name="as_sitesearch" value="hugoduncan.org" /></div></form></div></div>
 <div id='centercontent'>
 <div id='post'/>
 <hr />
-<div id='footer'><p><b id='updated'>Updated: 2008/02/20</b><br />
-<a href='/' onclick="setActiveStyleSheet('serif')" onkeypress="setActiveStyleSheet('serif')" accesskey='p'>Serif</a> / <a href='/' onclick="setActiveStyleSheet('sans')" onkeypress="setActiveStyleSheet('sans')" accesskey='p'>Sans-Serif</a><br />
-</p>
+<div id='footer'><div id='post-when'></div><div id='post-updated'></div>
+<p><a href='/' onclick="setActiveStyleSheet('serif')" onkeypress="setActiveStyleSheet('serif')" accesskey='p'>Serif</a> / <a href='/' onclick="setActiveStyleSheet('sans')" onkeypress="setActiveStyleSheet('sans')" accesskey='p'>Sans-Serif</a></p>
 </div>
 </div>
 
@@ -29,19 +28,17 @@
  <a rel="me" href="http://www.yellowfin.com">Yellowfin</a>
 <div class="vcard">
   <a class="fn url" href="http://hugoduncan.org/">Hugo Duncan</a>
-  <div><a class="email" href="mailto:tabcdef@hugoduncan.org">
-       <span class="type">pref</span><span>erred email</span>
-  </a></div>
+  <div><a class="email" href="mailto:tabcdef@hugoduncan.org"><span class="type">pref</span><span>erred email</span></a></div>
 </div>
 <div id="fonts">
 <hr />
 <a href="/"
- onclick="setActiveStyleSheet('serif')"
- onkeypress = "setActiveStyleSheet('serif')"
+ onclick="setActiveStyleSheet('serif'); return false;"
+ onkeypress = "setActiveStyleSheet('serif'); return false;"
  accesskey="p" id="serif">Serif</a>  &#xb7;
 <a href="/"
- onclick="setActiveStyleSheet('sans')"
- onkeypress = "setActiveStyleSheet('sans')"
+ onclick="setActiveStyleSheet('sans'); return false;"
+ onkeypress = "setActiveStyleSheet('sans'); return false;"
  accesskey="p" id="sans">Sans-Serif</a>
 <hr />
 </div>

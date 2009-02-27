@@ -13,7 +13,7 @@
   :maintainer "Hugo Duncan <hugo@hugoduncan.org>"
   :licence "Open source"
   :description "A generator for blog sites."
-  :depends-on (:cxml :cl-fad :elephant)
+  :depends-on (:cxml :cl-fad :elephant :local-time)
   :components
   ((:module "src"
 	    :components
