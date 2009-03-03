@@ -79,14 +79,55 @@
 	(is (string= "My First Blog Post" (cl-blog-generator::blog-post-title blog-post)))
 	(is (equalp '(24 02 2009)
 		    (cl-blog-generator::decode-date
-		     (cl-blog-generator::blog-post-when blog-post))))))))
+		     (cl-blog-generator::blog-post-when blog-post))))
+	(is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
+		     (funcall cl-blog-generator::*id-generator-fn* blog-post)))))))
+
+
+(deftest test-%adjacent-posts ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (multiple-value-bind (output-path blog-post1)
+	  (cl-blog-generator::%publish-draft (draft-path "first"))
+	(declare (ignore output-path))
+	(multiple-value-bind (output-path blog-post2)
+	    (cl-blog-generator::%publish-draft (draft-path "second"))
+	  (declare (ignore output-path))
+	  (multiple-value-bind (output-path blog-post3)
+	      (cl-blog-generator::%publish-draft (draft-path "third"))
+	    (declare (ignore output-path))
+	    (multiple-value-bind (prior next)
+		(cl-blog-generator::%adjacent-posts blog-post1)
+	      (is (null prior))
+	      (is (eql next blog-post3)))
+	    (multiple-value-bind (prior next)
+		(cl-blog-generator::%adjacent-posts blog-post2)
+	      (is (eql blog-post3 prior))
+	      (is (null next)))
+	    (multiple-value-bind (prior next)
+		(cl-blog-generator::%adjacent-posts blog-post3)
+	      (is (eql blog-post1 prior))
+	      (is (eql blog-post2 next )))
+	    ))))))
+
+(deftest test-%generate-site ()
+  (with-fixture delete-all-fixture
+    (cl-blog-generator::publish-draft (draft-path "first"))
+    (cl-blog-generator::publish-draft (draft-path "second"))
+    (cl-blog-generator::publish-draft (draft-path "third"))
+    (with-test-db
+      (let ((index-page (cl-blog-generator::site-file-path-for
+			 (cl-blog-generator::index-page))))
+	(is (not (cl-fad:file-exists-p index-page)))
+	(cl-blog-generator::%generate-site)
+	(is (cl-fad:file-exists-p index-page))))))
 
 (deftest test-publish-draft-first ()
   (with-fixture delete-all-fixture
     (destructuring-bind (pf sf)
-	(publish-draft (draft-path "first"))
-      (let ((sfe (format nil "~Apost/my_first_blog_post.xhtml" cl-blog-generator::*site-path*))
-	    (pfe (format nil "~Amy_first_blog_post.post" cl-blog-generator::*published-path*)))
+	(publish-draft (draft-path "first") :generate-site nil)
+      (let ((sfe (format nil "~Apost/2009/my_first_blog_post.xhtml" cl-blog-generator::*site-path*))
+	    (pfe (format nil "~Apost/2009/my_first_blog_post.post" cl-blog-generator::*published-path*)))
 	(is (string= sfe (namestring sf)))
 	(is (string= pfe (namestring pf)))
 	(is (cl-fad:file-exists-p sfe))

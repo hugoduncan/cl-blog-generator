@@ -1,7 +1,8 @@
 (defpackage #:cl-blog-generator
   (:use #:common-lisp)
-  (:nicknames #:blog-gen)
+  (:nicknames #:blogen)
   (:export #:publish-draft
+	   #:generate-site
 	   #:set-environment
 	   #:configure
 	   #:*blog-db-spec*
@@ -9,5 +10,6 @@
 	   #:*blog-root-path*
 	   #:*site-path*
 	   #:*published-path*
-	   #:*template-path*))
+	   #:*template-path*
+	   #:*relative-path-fn*))
 

@@ -28,9 +28,10 @@
   "The local directory that contains the xhtml templates.")
 
 ;;; Optional configuration for customising the behaviour of the system
-;; (defvar *id-generator-fn* #'%id-from-file
-;;   "Function used to generate a unique id for an item.")
-
+(defvar *id-generator-fn* nil
+  "Function used to generate a unique id for an item.")
+(defvar *relative-path-fn* nil
+  "The function used to generate the path of content relative to *BLOG-ROOT-PATH* or *PUBLISHED-PATH*")
 
 ;;; Tags used for identifying elements
 (defparameter *xhtml-xmlns* "http://www.w3.org/1999/xhtml")
@@ -53,10 +54,6 @@
   "ID of element to contain the post updated date")
 
 (defparameter *publish-xml-indentation* 0)
-
-;;; Singletons
-(defparameter *index-page* nil)
-(defparameter *atom-feed* nil)
 
 ;;;# Configuration environments
 
@@ -100,10 +97,6 @@
 	   (find char "!.,/\\|+=`~-@#$%^&*{}[]()\"':;<>")))
     (let ((sane (remove-if #'remove-character-p (string-downcase (substitute #\_ #\Space title)))))
       (values sane))))
-
-(defun %id-from-file (blog-post)
-  "Generate an id for the post."
-  (format nil "http://~A~A" *blog-domain* *site-path* (blog-post-filename blog-post)))
 
 ;;;## File System Helpers
 ;;; These functions generate local file paths based on the configuration.
@@ -206,13 +199,21 @@
 (defgeneric link-for (generated-content)
   (:documentation "Output a link for the object."))
 
+(defgeneric relative-path-for (generated-content)
+  (:documentation "Path of an item relative to *BLOG-ROOT* or *PUBLISHED-ROOT*."))
+
 (defmethod url-for (item)
   "Generic url-for implementation."
   (format nil "http://~A~A" *blog-domain* (path-for item)))
 
+(defmethod relative-path-for (item)
+  "Generic implementation for no relative path"
+  (declare (ignore item))
+  (values nil))
+
 (defun base-url ()
   "Base url-for the blog."
-  (format nil "http://~A~A" *blog-domain* *site-path*))
+  (format nil "http://~A~A" *blog-domain* *blog-root-path*))
 
 ;;;# Database
 
@@ -285,17 +286,38 @@
   (setf (slot-value blog-post 'filename)
 	(%sanitise-title (slot-value blog-post 'title))))
 
+(defmethod relative-path-for ((blog-post blog-post))
+  "Relative path for a blog post"
+  (list "post" (format nil "~A" (blog-post-year blog-post))))
+
+(defun relative-directory-for (item)
+  (append (list :relative) (funcall *relative-path-fn* item)))
+
+(defun relative-namestring-for (item)
+  (format nil "~{~A/~}" (funcall *relative-path-fn* item)))
+
 (defmethod published-file-path-for ((blog-post blog-post))
   "Find the publish file path for the specified BLOG-POST."
-  (make-pathname :defaults *published-path* :name (blog-post-filename blog-post) :type "post"))
+  (ensure-directories-exist
+   (merge-pathnames
+    (make-pathname :directory (relative-directory-for blog-post)
+		   :name (blog-post-filename blog-post)
+		   :type "post")
+    *published-path*)))
 
 (defmethod site-file-path-for ((blog-post blog-post))
   "Find the site file path for the specified BLOG-POST."
-  (merge-pathnames (make-pathname :directory '(:relative "post") :name (blog-post-filename blog-post) :type "xhtml") *site-path*))
+  (ensure-directories-exist
+   (merge-pathnames
+    (make-pathname :directory (relative-directory-for blog-post)
+		   :name (blog-post-filename blog-post)
+		   :type "xhtml") *site-path*)))
 
 
 (defmethod path-for ((blog-post blog-post))
-  (format nil "~Apost/~A.xhtml" *blog-root-path* (blog-post-filename blog-post)))
+  (format nil "~A~A~A.xhtml" *blog-root-path*
+	  (relative-namestring-for blog-post)
+	  (blog-post-filename blog-post)))
 
 (defmethod link-for ((blog-post blog-post))
   (cxml:with-element "span"
@@ -344,6 +366,30 @@
 	 do
 	   (multiple-value-setq (has-pair key value) (elephant:cursor-prev cursor))))))
 
+(defun %dirty-posts ()
+  "Create a list of all dirty posts."
+  (elephant:get-instances-by-value 'blog-post 'dirty t))
+
+(defun %adjacent-posts (blog-post)
+  "Return post before and after the given post."
+  (assert blog-post)
+  (elephant:with-btree-cursor (cursor (elephant:find-inverted-index 'blog-post 'when))
+    (let (has-pair key value prior next
+		   (when (blog-post-when blog-post))
+		   (oid (elephant::oid blog-post)))
+      (multiple-value-setq (has-pair key value)
+	(elephant:cursor-set cursor when))
+      (assert has-pair)
+      (assert (= oid value))
+      (multiple-value-setq (has-pair key value) (elephant:cursor-prev cursor))
+      (if has-pair
+	  (setf prior (elephant::controller-recreate-instance elephant:*store-controller* value)))
+      (multiple-value-setq (has-pair key value) (elephant:cursor-next cursor))
+      (multiple-value-setq (has-pair key value) (elephant:cursor-next cursor))
+      (if has-pair
+	  (setf next (elephant::controller-recreate-instance elephant:*store-controller* value)))
+      (values prior next))))
+
 
 
 
@@ -352,15 +398,16 @@
 ;;; Generate a blog post from an input post file.  The post is read and a
 ;;; published post file is created.  Metadata for the post is read and stored in
 ;;; the database.  Optionally, the site is regenerated.
-(defun publish-draft (path &key (generate-site t))
+(defun publish-draft (path &key (generate-site nil))
   "Publish the draft post at the specified filesystem PATH. Returns a list with
 the path to the published file and the site path."
   (elephant:with-open-store (*blog-db-spec*)
     (elephant:with-transaction ()
       (multiple-value-bind (output-path blog-post)
 	  (%publish-draft (pathname path))
-	(when generate-site
-	  (generate-page blog-post))
+	(if generate-site
+	    (generate-site)
+	    (generate-page blog-post))
 	(list (namestring output-path) (site-file-path-for blog-post))))))
 
 ;;; Publish a draft. This puts the draft into publish, and creates database meta
@@ -436,10 +483,17 @@ month year), tags, and synopsis."
 ;;; pages and marks them dirty
 (defun %mark-connected-posts-dirty (blog-post)
   "Mark as dirty anything that the post should cause to be regenerated"
-  (setf (dirty (index-page)) t)
   (let ((recent-posts (%recent-posts)))
-    (generate-page (index-page) :collection recent-posts)
-    (generate-page (atom-feed) :collection recent-posts)))
+    (when (find blog-post recent-posts)
+      (assert (index-page))
+      (setf (dirty (index-page)) t)
+      (assert (index-page))
+      (setf (dirty (atom-feed)) t))
+    (multiple-value-bind (prior next) (%adjacent-posts blog-post)
+      (when prior
+	(setf (dirty prior) t))
+      (when next
+	(setf (dirty next) t)))))
 
 ;;; Publish a draft by copying it to the published path, adding the
 ;;; "post-when" element.  This ensures that all meta-data is in the
@@ -466,7 +520,31 @@ then this code will not be executed)."
 	    (cxml:attribute "year" (nth 2 post-when)))
 	  (klacks:find-event tapped :end-document))))))
 
-;;;# Output functions
+;;;# Site Generation
+(defun %generate-site ()
+  "Generate all dirty content for the site.  Assumes an existing database connection."
+  (let ((dirty-posts (%dirty-posts))
+	(index-page (index-page))
+	(atom-feed (atom-feed)))
+    (loop
+       for blog-post in dirty-posts
+       do
+	 (multiple-value-bind (prior next) (%adjacent-posts blog-post)
+	   (generate-page blog-post :prior prior :next next)))
+    (when (or (dirty index-page) (dirty atom-feed))
+      (let ((recent-posts (%recent-posts)))
+	(when (dirty index-page)
+	  (generate-page index-page :collection recent-posts))
+	  (when (dirty atom-feed)
+	    (generate-page atom-feed :collection recent-posts))))))
+
+(defun generate-site ()
+  "Generate all dirty content for the site. Creates a database connection."
+  (elephant:with-open-store (*blog-db-spec*)
+    (elephant:with-transaction ()
+      (%generate-site))))
+
+;;;## Output functions
 ;;; Used to output content
 
 (defun output-post-content (blog-post output)
@@ -512,7 +590,7 @@ then this code will not be executed)."
     (cxml:with-element "title"
       (cxml:text (blog-post-title blog-post)))
     (cxml:with-element "link"
-      (cxml:attribute "href" (path-for blog-post)))
+      (cxml:attribute "href" (funcall *id-generator-fn* blog-post)))
     (cxml:with-element "id" ;; TODO - fixme
       (cxml:text (url-for blog-post)))
     (cxml:with-element "published"
@@ -544,15 +622,21 @@ then this code will not be executed)."
     (cons *post-when-id* #'output-post-when)
     (cons *post-updated-id*  #'output-post-updated)))
 
+;;;## Page generators
 ;;; Generates a blog page.
-(defmethod generate-page ((blog-post blog-post) &key &allow-other-keys)
+(defmethod generate-page ((blog-post blog-post) &key next prior &allow-other-keys)
   "Generate the page for a blog-post.  Takes the template and merges the post into it."
   (format t "Generating post '~A'~%" (blog-post-title blog-post))
   (flet ((output-post-head-title (template)
 	   "Assusmes current element is the template title"
 	   (klacks:peek-next template) ; consume title tag and title text
 	   (cxml:text (blog-post-title blog-post))
-	   (klacks:peek-next template)))  ; close the title tag
+	   (klacks:peek-next template)) ; close the title tag
+	 (output-post-link (post rel)
+	   "Assusmes current element is in the document head"
+	   (cxml:with-element "link"
+	     (cxml:attribute "rel" rel)
+	     (cxml:attribute "href" (path-for post)))))
     (let ((output-path (site-file-path-for blog-post)))
       (klacks:with-open-source
 	  (template (cxml:make-source (%template-path "post")))
@@ -567,6 +651,10 @@ then this code will not be executed)."
 	    (cxml:with-xml-output output
 	      (klacks:find-element tapped *post-title*)
 	      (output-post-head-title tapped)
+	      (when prior
+		(output-post-link prior "prev"))
+	      (when next
+		(output-post-link next "next"))
 	      ;; TODO - add meta links for navigation
 	      (loop
 		 for id = (%find-div-or-span-with-an-id tapped)
@@ -574,7 +662,8 @@ then this code will not be executed)."
 		 for cmd = (assoc id *id-dispatch-table* :test #'string=)
 		 do
 		   (when cmd
-		     (funcall (cdr cmd) blog-post output))))))))))
+		     (funcall (cdr cmd) blog-post output)))))))))
+  (setf (dirty blog-post) nil))
 
 
 ;;; Generates the index page by finding a list of recent posts, and listing
@@ -596,7 +685,8 @@ then this code will not be executed)."
 	    (cxml:with-element "div"
 	      (cxml:attribute "class" "post-synopsis")
 	      (mapc #'output-post-link collection))
-	    (klacks:find-event tapped :end-document)))))))
+	    (klacks:find-event tapped :end-document))))))
+  (setf (dirty index-page) nil))
 
 ;;; Generates the atom feed by finding a list of recent posts, and listing
 ;;; links to them with the full contents of each.
@@ -617,11 +707,14 @@ then this code will not be executed)."
 	  (klacks:consume tapped)
 	  (loop for blog-post in collection
 	     do (output-post-atom-entry blog-post output))
-	  (klacks:find-event tapped :end-document))))))
+	  (klacks:find-event tapped :end-document)))))
+  (setf (dirty atom-feed) nil))
 
 
-
-
+;;; Defaults for configuration
+(eval-when (:load-toplevel :execute)
+  (setf *relative-path-fn* #'relative-path-for)
+  (setf *id-generator-fn* #'url-for))
 
 
 ;;; Hacks
@@ -637,6 +730,9 @@ then this code will not be executed)."
        (elephant:get-instances-by-class 'blog-post))
       (elephant:drop-instances
        (elephant:get-instances-by-class 'generated-content)))))
+
+(defun blog-index-page ()
+  (site-file-path-for (index-page)))
 
 ;;; ensure pbook output is as intended:
 
