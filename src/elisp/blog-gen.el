@@ -35,7 +35,28 @@
   "Minor mode for generating blog entries.
 \\<blog-gen-mode-map>"
   :lighter " Blog-Gen"
-  (slime-load-system "cl-blog-generator"))
+  (blog-gen-require-cl-blog-generator)
+;;   (slime-load-system "cl-blog-generator")
+  )
+
+(defvar blog-gen-package "my-blog")
+
+(defun blog-gen-require-cl-blog-generator ()
+  (if (slime-connected-p)
+      (let ((cmd (format "(unless (cl:find-package '%s) (require '%s))"
+		   blog-gen-package blog-gen-package)))
+	(slime-eval-async
+	 `(swank:eval-and-grab-output ,cmd)
+	 (lambda (result))))))
+
+(defun blog-gen-output-buffer ()
+  "FInd or create the output buffer"
+  (let ((output-buffer (get-buffer "*Site Publisher*")))
+    (unless output-buffer
+      (setf output-buffer (generate-new-buffer "*Site Publisher*"))
+      (with-current-buffer output-buffer
+	(compilation-minor-mode)))
+    output-buffer))
 
 (defun blog-gen-execute-and-visit (cmd-string)
   "Eval CMD-STRING in Lisp; assume output is a file name to visit."
@@ -43,7 +64,6 @@
    `(swank:eval-and-grab-output ,cmd-string)
    (lambda (result)
      (destructuring-bind (output value) result
-       (message "%s %s" (type-of value) value)
        (let* ((res (read-from-string value))
 	      (published-path (caar res))
 	      (site-path (cadar res)))
@@ -53,10 +73,9 @@
 	   (when buf
 	     (switch-to-buffer buf)))
 	 (browse-url (format "http://localhost%s" site-path))
-	 (save-current-buffer
-	   (set-buffer (get-buffer-create "*Site Publisher*"))
-	   (insert output)
+	 (with-current-buffer (blog-gen-output-buffer)
 	   (when (plusp (length output))
+	     (insert output)
 	     (switch-to-buffer-other-window (current-buffer)))))))))
 
 (defun blog-gen-publish-draft ()
