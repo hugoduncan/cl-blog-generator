@@ -11,7 +11,7 @@
   :author "Hugo Duncan <hugo@hugoduncan.org>"
   :version "0.1"
   :maintainer "Hugo Duncan <hugo@hugoduncan.org>"
-  :licence "Open source"
+  :licence "BSD Open Source"
   :description "A generator for blog sites."
   :depends-on (:cxml :cl-fad :elephant :local-time)
   :components
@@ -23,6 +23,7 @@
 (defsystem #:cl-blog-generator-test
   :name "cl-blog-generator-test"
   :author "Hugo Duncan <hugo@hugoduncan.org>"
+  :licence "BSD Open Source"
   :depends-on (#:cl-blog-generator #:stefil)
   :components
   ((:module "test"

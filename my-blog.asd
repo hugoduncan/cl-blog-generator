@@ -11,7 +11,7 @@
   :author "Hugo Duncan <hugo@hugoduncan.org>"
   :version "0.1"
   :maintainer "Hugo Duncan <hugo@hugoduncan.org>"
-  :licence "Open source"
+  :licence "BSD Open Source"
   :description "Configuration of blog."
   :depends-on (:cl-blog-generator)
   :components

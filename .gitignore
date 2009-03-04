@@ -1,5 +1,3 @@
 #*#
 .#*
-content/site/*.xhtml
-content/site/post/*.xhtml
 *.fasl
