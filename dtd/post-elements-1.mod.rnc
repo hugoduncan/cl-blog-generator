@@ -4,11 +4,17 @@ default namespace = "http://hugoduncan.org/xmlns/post"
 
 when = element when { when.attlist, empty }
 when.attlist &=
-  attribute year { text }?,
-  attribute month { text }?,
-  attribute day { text }?,
-  Post.Common.attrib
+  attribute year { text },
+  attribute month { text },
+  attribute day { text }
+updated = element updated { updated.attlist, empty }
+updated.attlist &=
+  attribute year { text },
+  attribute month { text },
+  attribute day { text }
 tag = element tag { tag.attlist, text }
-tag.attlist &= Post.Common.attrib
-# Model for our module - how our dtd patches into xhtml
-HeadOpts.mix = (script | style | meta | link | object | tag | when)*
+tag.attlist &=
+  Post.xmlns.attrib,
+  attribute id { xsd:ID }?
+linkname = element linkname { linkname.attlist, text }
+linkname.attlist &= empty

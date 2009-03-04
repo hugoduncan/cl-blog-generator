@@ -1,13 +1,15 @@
-# Define the global namespace attributes
+# Model for our module - how our dtd patches into xhtml
 
-# Define a common set of attributes for all module elements
-
-Post.Common.attrib =
-  Post.xmlns.attrib,
-  attribute id { xsd:ID }?
-# Now declare the qualified names for all of the elements in the
-# module
-
+HeadOpts.mix =
+  (script
+   | style
+   | meta
+   | link
+   | object
+   | tag
+   | when
+   | updated
+   | linkname)*
 # .......................................................................
 
 # XHTML 1.1 Document Model Module  ......................................

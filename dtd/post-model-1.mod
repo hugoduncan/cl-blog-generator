@@ -1,27 +1,12 @@
 
 
 
-<!-- Define the global namespace attributes -->
-<![%Post.prefixed;[
-<!ENTITY % Post.xmlns.attrib
-    "%NS.decl.attrib;"
->
-]]>
-<!ENTITY % Post.xmlns.attrib
-     "%NS.decl.attrib;
-     xmlns  %URI.datatype;  #FIXED '%Post.xmlns;'"
->
+<!-- Model for our module - how our dtd patches into xhtml -->
 
-<!-- Define a common set of attributes for all module elements -->
-<!ENTITY % Post.Common.attrib
-  "%Post.xmlns.attrib; id ID #IMPLIED"
+<!ENTITY % HeadOpts.mix
+     "( %script.qname; | %style.qname; | %meta.qname;
+      | %link.qname; | %object.qname; | %Post.tag.qname; | %Post.when.qname; | %Post.updated.qname; | %Post.linkname.qname; )*"
 >
-
-<!-- Now declare the qualified names for all of the elements in the
-     module -->
-<!ENTITY % Post.when.qname "%Post.pfx;when" >
-<!ENTITY % Post.tag.qname "%Post.pfx;tag" >
-
 
 
 <!-- ....................................................................... -->

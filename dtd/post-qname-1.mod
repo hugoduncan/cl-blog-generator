@@ -54,8 +54,11 @@
     %Post.xmlns.attrib.prefixed;"
 >
 
-
 <!-- Now declare the qualified names for all of the elements in the
      module -->
 <!ENTITY % Post.when.qname "%Post.pfx;when" >
+<!ENTITY % Post.updated.qname "%Post.pfx;updated" >
+<!ENTITY % Post.linkname.qname "%Post.pfx;linkname" >
 <!ENTITY % Post.tag.qname "%Post.pfx;tag" >
+
+

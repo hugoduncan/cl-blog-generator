@@ -38,6 +38,8 @@
 (defparameter *post-xmlns* "http://hugoduncan.org/xmlns/post")
 
 (defparameter *post-when* "when")
+(defparameter *post-updated* "updated")
+(defparameter *post-linkname* "linkname")
 (defparameter *post-tag* "tag")
 (defparameter *post-title* "title")
 (defparameter *post-head* "head")
@@ -53,7 +55,7 @@
 (defparameter *post-updated-id* "post-updated"
   "ID of element to contain the post updated date")
 
-(defparameter *publish-xml-indentation* 0)
+(defparameter *publish-xml-indentation* nil)
 
 ;;;# Configuration environments
 
@@ -267,7 +269,7 @@
 
 ;;;### Blog post
 (defclass blog-post (generated-content)
-  ((filename :reader blog-post-filename)
+  ((filename :initarg :filename :reader blog-post-filename :index t)
    (title :initarg :title :accessor blog-post-title :index t)
    (tags :initarg :tags :initform nil :accessor blog-post-tags :index t)
    (when :initarg :when :initform nil :reader blog-post-when
@@ -277,14 +279,15 @@
 	    :type unsigned-byte :index t
 	    :documentation "Last update time")
    (synopsis :initarg :synopsis :initform nil :accessor blog-post-synopsis))
-  (:index t)
   (:metaclass elephant:persistent-metaclass)
   (:documentation "Metadata for blog-posts"))
 
 (defmethod shared-initialize :after
     ((blog-post blog-post) slot-names &key &allow-other-keys)
   (setf (slot-value blog-post 'filename)
-	(%sanitise-title (slot-value blog-post 'title))))
+	(if (slot-value blog-post 'filename)
+	    (%sanitise-title (slot-value blog-post 'filename))
+	    (%sanitise-title (slot-value blog-post 'title)))))
 
 (defmethod relative-path-for ((blog-post blog-post))
   "Relative path for a blog post"
@@ -353,6 +356,10 @@
   (subseq (multiple-value-list (decode-universal-time utime)) 3 6))
 
 ;;;## Database Utilities
+(defmacro with-open-store (() &body body)
+  `(elephant:with-open-store (*blog-db-spec*)
+     (elephant:with-transaction ()
+       ,@body)))
 
 (defun %recent-posts (&key (n 10))
   "Create a list of recent posts."
@@ -397,18 +404,32 @@
 
 ;;; Generate a blog post from an input post file.  The post is read and a
 ;;; published post file is created.  Metadata for the post is read and stored in
-;;; the database.  Optionally, the site is regenerated.
+;;; the database.  Optionally, the site is regenerated.  The output page for
+;;; the post is always generated, so it may be proofed
 (defun publish-draft (path &key (generate-site nil))
   "Publish the draft post at the specified filesystem PATH. Returns a list with
 the path to the published file and the site path."
-  (elephant:with-open-store (*blog-db-spec*)
-    (elephant:with-transaction ()
-      (multiple-value-bind (output-path blog-post)
-	  (%publish-draft (pathname path))
-	(if generate-site
-	    (generate-site)
-	    (generate-page blog-post))
-	(list (namestring output-path) (site-file-path-for blog-post))))))
+  (with-open-store ()
+    (multiple-value-bind (output-path blog-post)
+	(%publish-draft (pathname path))
+      (if generate-site
+	  (generate-site)
+	  (generate-page blog-post))
+      (list (namestring output-path) (site-file-path-for blog-post)))))
+
+;;; Republishing uses the "updated" element in the "head" to set the updated time
+;;; on the post.  If no "updated" is present, then one is added eith the current
+;;; date
+(defun publish-updated-post (path &key (generate-site nil))
+  "Publish an updated post at the specified filesystem PATH. Returns a list with
+the path to the published file and the site path."
+  (with-open-store ()
+    (multiple-value-bind (output-path blog-post)
+	(%publish-updated-post (pathname path))
+      (if generate-site
+	  (generate-site)
+	  (generate-page blog-post))
+      (list (namestring output-path) (site-file-path-for blog-post)))))
 
 ;;; Publish a draft. This puts the draft into publish, and creates database meta
 ;;; info for it. Returns the published file path and the blog-post metadata.
@@ -417,56 +438,99 @@ the path to the published file and the site path."
 ;;; proceed.
 (defun %publish-draft (path)
   "Publish the draft at the filesystem PATH."
-  (multiple-value-bind (title post-when tags synopsis) (%parse-post-info path)
-    (let ((existing-post (elephant:get-instances-by-value 'blog-post 'title title)))
+  (multiple-value-bind (title post-when post-updated tags linkname synopsis)
+      (%parse-post-info path)
+    (let ((existing-post
+	   (elephant:get-instances-by-value 'blog-post 'title title)))
       (if existing-post
 	  (restart-case
 	      (error "This blog post already exists.")
 	    (delete-existing-entry ()
 	      (elephant:drop-instances existing-post)))))
 
-    (let ((draft-has-complete-metadata post-when))
-      (unless post-when
-	(setf post-when (decode-local-date (get-universal-time))))
+    (unless post-when
+      (setf post-when (decode-local-date (get-universal-time))))
 
-      (let ((blog-post (make-instance 'blog-post :title title
-				      :when (encode-date post-when)
-				      :tags tags
-				      :synopsis synopsis)))
-	(let* ((output-path (published-file-path-for blog-post)))
-	  (if draft-has-complete-metadata
-	      (cl-fad:copy-file path output-path :overwrite t)
-	      (%publish-draft-inserting-post-when path output-path post-when))
-	  (%mark-connected-posts-dirty blog-post)
-	  (values output-path blog-post))))))
+    (let ((blog-post
+	   (make-instance 'blog-post
+			  :title title
+			  :when (encode-date post-when)
+			  :updated (if post-updated
+				       (encode-date post-updated))
+			  :tags tags
+			  :filename linkname
+			  :synopsis synopsis)))
+      (let* ((output-path (published-file-path-for blog-post)))
+	(%publish-draft-updating-post-metadata path output-path blog-post)
+	(%mark-connected-posts-dirty blog-post)
+	(values output-path blog-post)))))
 
-;;; Parse the "title", "post-when" and "tag" elements.  Also store the first
+
+
+;;; Publish an updated post, adding an updated date. Returns the published file
+;;; path and the blog-post metadata.
+(defun %publish-updated-post (path)
+  "Publish the updated post at the filesystem PATH."
+  (multiple-value-bind (title post-when post-updated tags linkname synopsis)
+      (%parse-post-info path)
+    (declare (ignore post-when tags))
+    (let ((existing-post
+	   (elephant:get-instances-by-value 'blog-post 'filename linkname)))
+      (when existing-post
+	(assert (= 1 (length existing-post)))
+	(setf existing-post (first existing-post)))
+      (unless existing-post
+	(error "This blog post can not be found. Ensure that the linkname has not been changed."))
+      (unless (equal (published-file-path-for existing-post) path)
+	(error "This blog post is not in the expected location. Ensure that the file has not been moved."))
+
+      (unless post-updated
+	(setf post-updated (decode-local-date (get-universal-time))))
+
+      ;; update metadata
+      (setf (blog-post-updated existing-post) (encode-date post-updated))
+      (setf (blog-post-synopsis existing-post) synopsis)
+      (setf (blog-post-title existing-post) title)
+
+      (let* ((output-path (make-pathname :type "tmp" :defaults path)))
+	(%publish-draft-updating-post-metadata path output-path existing-post)
+	(cl-fad:copy-file output-path path :overwrite t)
+	(%mark-connected-posts-dirty existing-post)
+	(values output-path existing-post)))))
+
+;;; Parse the "title", "when", "updated", "linkname" and "tag" elements.  Also store the first
 ;;; paragraph of the post to act as a synopsis.
 (defun %parse-post-info (path)
-  "Parse the input file at PATH, extracting the metadata.  Returns title, (day
-month year), tags, and synopsis."
-  (let (title tags post-when synopsis)
-    (flet ((decode-when ()
-	     (when post-when
-	       (list (cdr (assoc :day post-when))
-		     (cdr (assoc :month post-when))
-		     (cdr (assoc :year post-when))))))
+  "Parse the input file at PATH, extracting the metadata.  Returns title,
+when (day month year), updated (day month year), tags, linkname, and synopsis."
+  (let (title tags post-when post-updated linkname synopsis attribs)
+    (flet ((decode-date (date-data)
+	     (when date-data
+	       (loop for key in '(:day :month :year)
+		  collect (cdr (assoc key date-data)))))
+	   (attribute-mapper (ns lname qname attrib-value explicit-p)
+		     (declare (ignore ns qname explicit-p))
+		     (push (cons (intern (string-upcase lname) 'KEYWORD)
+				 (read-from-string attrib-value)) attribs)))
       (klacks:with-open-source (post (cxml:make-source path))
 	(loop
 	   do
 	   (multiple-value-bind (key ns element) (klacks:consume post)
 	     (cond
 	       ((start-post-element-p key ns element *post-when*)
-		(klacks:map-attributes
-		 #'(lambda (ns lname qname attrib-value explicit-p)
-		     (declare (ignore ns qname explicit-p))
-		     (push (cons (intern (string-upcase lname) 'KEYWORD)
-				 (read-from-string attrib-value)) post-when))
-		 post))
+		(setf attribs nil)
+		(klacks:map-attributes #'attribute-mapper post)
+		(setf post-when attribs))
+	       ((start-post-element-p key ns element *post-updated*)
+		(setf attribs nil)
+		(klacks:map-attributes #'attribute-mapper post)
+		(setf post-updated attribs))
 	       ((start-post-element-p key ns element *post-title*)
 		(setf title (klacks:consume-characters post)))
 	       ((start-post-element-p key ns element *post-tag*)
 		(push (klacks:consume-characters post) tags))
+	       ((start-post-element-p key ns element *post-linkname*)
+		(setf linkname (klacks:consume-characters post)))
 	       ((end-post-element-p key ns element *post-head*)
 		(return nil)))))
 	(klacks:find-element post *post-body*)
@@ -476,18 +540,18 @@ month year), tags, and synopsis."
 	  (%find-end-element tapped "p")
 	  (klacks:consume tapped)
 	  (setf synopsis (sax:end-document output))))
-      (values title (decode-when) tags synopsis))))
+      (values title (decode-date post-when) (decode-date post-updated)
+	      tags linkname synopsis))))
 
 ;;; When a blog post is published or changes, then some of the pages that
 ;;; link to the post will need to be updated.  This function finds all such
-;;; pages and marks them dirty
+;;; pages and marks them dirty.  The index and atom-feed will need updating
+;;; if the post is in the recent-posts list.
 (defun %mark-connected-posts-dirty (blog-post)
   "Mark as dirty anything that the post should cause to be regenerated"
   (let ((recent-posts (%recent-posts)))
     (when (find blog-post recent-posts)
-      (assert (index-page))
       (setf (dirty (index-page)) t)
-      (assert (index-page))
       (setf (dirty (atom-feed)) t))
     (multiple-value-bind (prior next) (%adjacent-posts blog-post)
       (when prior
@@ -499,7 +563,41 @@ month year), tags, and synopsis."
 ;;; "post-when" element.  This ensures that all meta-data is in the
 ;;; published post, removing any reliance on maintaing the metadata
 ;;; in the database.
-(defun %publish-draft-inserting-post-when (path output-path post-when)
+;;; Table mapping element id's to the corresponding output function
+(defun write-post-date (date tag)
+  (when date
+    (let ((post-when (decode-date date)))
+      (cxml:with-element tag
+	(cxml:attribute "day" (first post-when))
+	(cxml:attribute "month" (second post-when))
+	(cxml:attribute "year" (nth 2 post-when))))))
+
+(defun write-post-when (blog-post)
+  (write-post-date (blog-post-when blog-post) *post-when*))
+
+(defun write-post-updated (blog-post)
+  (write-post-date (blog-post-updated blog-post) *post-updated*))
+
+(defun write-post-title (blog-post)
+  (let ((title (blog-post-title blog-post)))
+    (when title
+      (cxml:with-element *post-title*
+	(cxml:text title)))))
+
+(defun write-post-linkname (blog-post)
+  (let ((linkname (blog-post-filename blog-post)))
+    (when linkname
+      (cxml:with-element *post-linkname*
+	(cxml:text linkname)))))
+
+(defparameter *element-dispatch-table*
+  (list
+    (cons *post-when*  #'write-post-when)
+    (cons *post-title*  #'write-post-title)
+    (cons *post-updated*  #'write-post-updated)
+    (cons *post-linkname*  #'write-post-linkname)))
+
+(defun %publish-draft-updating-post-metadata (path output-path blog-post)
   "Copy the source inserting the post-when info.  If the output file exists,
 then it is overwritten (if the user has not chosen to delete an existing post,
 then this code will not be executed)."
@@ -508,17 +606,48 @@ then this code will not be executed)."
 			    :element-type '(unsigned-byte 8)
 			    :if-exists :supersede)
       (let* ((output (cxml:make-octet-stream-sink
-		      stream :canonical nil :indentation *publish-xml-indentation*
+		      stream :canonical nil
+		      :indentation *publish-xml-indentation*
 		      :omit-xml-declaration-p t))
-	     (tapped (klacks:make-tapping-source draft output)))
-	(cxml:with-xml-output output
-	  (klacks:find-element tapped *post-title*)
-	  (klacks:find-event tapped :end-element)
-	  (cxml:with-element "when"
-	    (cxml:attribute "day" (first post-when))
-	    (cxml:attribute "month" (second post-when))
-	    (cxml:attribute "year" (nth 2 post-when)))
-	  (klacks:find-event tapped :end-document))))))
+	     (tapped (klacks:make-tapping-source draft output))
+	     (elements-to-process (list *post-when* *post-updated* *post-title* *post-linkname*)))
+	(labels ((write-element (name)
+		   (funcall (cdr (assoc name *element-dispatch-table* :test #'string=))
+			    blog-post))
+		 (suppress-output-of-next-element ()
+		   (setf (cxml::seen-event-p tapped) t))
+		 (ensure-output-of-suppressed-element ()
+		   (setf (cxml::seen-event-p tapped) nil))
+		 (suppress-current-element ()
+		   (loop do
+			(klacks:consume tapped)
+			(suppress-output-of-next-element)
+		      until (eql (klacks:peek tapped) :end-element))
+		   (klacks:consume tapped)))
+	  (cxml:with-xml-output output
+	    (loop do
+		 (suppress-output-of-next-element)
+		 (multiple-value-bind (key ns lname) (klacks:peek tapped)
+		   (cond
+		     ((null key)
+		      (restart-case
+			  (error "Error outputing updated post.  Please validate your editted post.")
+			(return-from-output () (return nil))))
+		     ((and (eql key :start-element)
+			   (find lname elements-to-process :test #'string=))
+		      (setf elements-to-process (delete lname elements-to-process :test #'string=))
+		      (write-element lname)
+		      (suppress-current-element))
+		     ((and (end-post-element-p key ns lname *post-head*))
+		      (loop for element in elements-to-process
+			 do (write-element element))
+		      (ensure-output-of-suppressed-element)
+		      (klacks:consume tapped)
+		      (return nil))
+		     (t
+		      (ensure-output-of-suppressed-element)
+		      (klacks:consume tapped)))))
+	    (klacks:find-event tapped :end-document)))))))
 
 ;;;# Site Generation
 (defun %generate-site ()
@@ -540,9 +669,8 @@ then this code will not be executed)."
 
 (defun generate-site ()
   "Generate all dirty content for the site. Creates a database connection."
-  (elephant:with-open-store (*blog-db-spec*)
-    (elephant:with-transaction ()
-      (%generate-site))))
+  (with-open-store ()
+    (%generate-site)))
 
 ;;;## Output functions
 ;;; Used to output content
@@ -570,11 +698,12 @@ then this code will not be executed)."
   (cxml:text (format nil "~{~A~^-~}" (decode-date (blog-post-when blog-post)))))
 
 (defun output-post-updated (blog-post output)
-  (declare (ignore output blog-post))
-;;   (let ((updated (blog-post-updated blog-post)))
-;;     (when updated
-;;       (cxml:text (format nil "~{~A~^-~}" (decode-date updated)))))
-  )
+  (declare (ignore output))
+   (let ((updated (blog-post-updated blog-post)))
+     (when updated
+       (cxml:with-element "span"
+	 (cxml:attribute "id" "post-updated-date")
+	 (cxml:text (format nil "~{~A~^-~}" (decode-date updated)))))))
 
 (defun output-post-synopsis (blog-post output)
   "Output the synopsis"
@@ -636,7 +765,8 @@ then this code will not be executed)."
 	   "Assusmes current element is in the document head"
 	   (cxml:with-element "link"
 	     (cxml:attribute "rel" rel)
-	     (cxml:attribute "href" (path-for post)))))
+	     (cxml:attribute "href" (path-for post))
+	     (cxml:attribute "title" (blog-post-title post)))))
     (let ((output-path (site-file-path-for blog-post)))
       (klacks:with-open-source
 	  (template (cxml:make-source (%template-path "post")))
@@ -698,12 +828,13 @@ then this code will not be executed)."
 	(stream (site-file-path-for atom-feed) :direction :output
 		:element-type '(unsigned-byte 8) :if-exists :supersede)
       (let* ((output (cxml:make-octet-stream-sink stream :canonical nil
-						  :indentation 0
+						  :indentation nil
 						  :omit-xml-declaration-p t))
 	     (tapped (klacks:make-tapping-source template output)))
 	(cxml:with-xml-output output
 	  (klacks:find-element tapped "updated")
 	  (cxml:text (local-time:format-rfc3339-timestring nil (local-time:now)))
+	  (klacks:consume tapped)
 	  (klacks:consume tapped)
 	  (loop for blog-post in collection
 	     do (output-post-atom-entry blog-post output))
@@ -719,17 +850,15 @@ then this code will not be executed)."
 
 ;;; Hacks
 (defun recent-posts ()
-  (elephant:with-open-store (*blog-db-spec*)
-    (elephant:with-transaction ()
-      (%recent-posts))))
+  (with-open-store ()
+    (%recent-posts)))
 
 (defun drop-all-yes-i-know-what-i-am-doing ()
-  (elephant:with-open-store (*blog-db-spec*)
-    (elephant:with-transaction ()
-      (elephant:drop-instances
-       (elephant:get-instances-by-class 'blog-post))
-      (elephant:drop-instances
-       (elephant:get-instances-by-class 'generated-content)))))
+  (with-open-store ()
+    (elephant:drop-instances
+     (elephant:get-instances-by-class 'blog-post))
+    (elephant:drop-instances
+     (elephant:get-instances-by-class 'generated-content))))
 
 (defun blog-index-page ()
   (site-file-path-for (index-page)))

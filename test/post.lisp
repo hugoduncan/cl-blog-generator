@@ -55,19 +55,39 @@
      (cl-fad:walk-directory *site-path* #'delete-file)
      (cl-fad:walk-directory *published-path* #'delete-file)))
 
+(defixture test-environment-fixture
+    (:setup
+     (configure :test)))
+
+(defun synopsis= (a b)
+  (declare (ignore a b))
+  ;; need to work out the type of the sysnopsis...
+  ;; (is (string= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
+  t)
 
 (deftest test-%parse-post-info-first ()
-  (with-fixture delete-all-fixture
-    (with-test-db
-      (multiple-value-bind (title when tags synopsis)
-	  (cl-blog-generator::%parse-post-info (draft-path "first"))
-	(declare (ignore synopsis))
-	(is (string= title "My First Blog Post"))
-	(is (equalp '(24 02 2009) when))
-	(is (equalp '("lisp" "blog") tags))
-	;; need to work out the type of the sysnopsis...
-	;; (is (string= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
-	))))
+  (with-fixture test-environment-fixture
+    (multiple-value-bind (title when updated tags linkname synopsis)
+	(cl-blog-generator::%parse-post-info (draft-path "first"))
+      (is (string= title "My First Blog Post"))
+      (is (equalp '(24 02 2009) when))
+      (is (equalp '("lisp" "blog") tags))
+      (is (not linkname))
+      (is (not updated))
+      (is (synopsis= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
+      )))
+
+(deftest test-%parse-post-info-second ()
+  (with-fixture test-environment-fixture
+    (multiple-value-bind (title when updated tags linkname synopsis)
+	(cl-blog-generator::%parse-post-info (draft-path "second"))
+      (is (string= title "My Second Blog Post"))
+      (is (equalp '(26 02 2009) when))
+      (is (equalp '("lisp" "blog") tags))
+      (is (string= linkname "a_second_blog_post_with_an_explicit_linkname"))
+      (is (equalp '(27 02 2009) updated))
+      (is (synopsis= "<p>My second post.  With an explicit linkname, and an updated tag.</p>" synopsis))
+      )))
 
 
 (deftest test-%publish-draft-first ()
@@ -76,12 +96,124 @@
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(is (cl-fad:file-exists-p output-path))
-	(is (string= "My First Blog Post" (cl-blog-generator::blog-post-title blog-post)))
+	(is (string= "My First Blog Post"
+		     (cl-blog-generator::blog-post-title blog-post)))
+	(is (string= "my_first_blog_post"
+		     (cl-blog-generator::blog-post-filename blog-post)))
 	(is (equalp '(24 02 2009)
 		    (cl-blog-generator::decode-date
 		     (cl-blog-generator::blog-post-when blog-post))))
+	(is (null (cl-blog-generator::blog-post-updated blog-post)))
 	(is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
+		     (funcall cl-blog-generator::*id-generator-fn* blog-post)))
+
+	(multiple-value-bind (title when updated tags linkname synopsis)
+	    (cl-blog-generator::%parse-post-info output-path)
+	  (is (string= title "My First Blog Post"))
+	  (is (equalp '(24 02 2009) when))
+	  (is (equalp '("lisp" "blog") tags))
+	  (is (string= linkname "my_first_blog_post"))
+	  (is (null updated))
+	  (is (synopsis= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
+	  )))))
+
+
+
+
+(deftest test-%publish-draft-second ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (multiple-value-bind (output-path blog-post)
+	  (cl-blog-generator::%publish-draft (draft-path "second"))
+	(is (cl-fad:file-exists-p output-path))
+	(is (string= "My Second Blog Post"
+		     (cl-blog-generator::blog-post-title blog-post)))
+	(is (string= "a_second_blog_post_with_an_explicit_linkname"
+		     (cl-blog-generator::blog-post-filename blog-post)))
+	(is (equalp '(26 02 2009)
+		    (cl-blog-generator::decode-date
+		     (cl-blog-generator::blog-post-when blog-post))))
+	(is (equalp '(27 02 2009)
+		    (cl-blog-generator::decode-date
+		     (cl-blog-generator::blog-post-updated blog-post))))
+	(is (string= "http://hugoduncan.org/blog/post/2009/a_second_blog_post_with_an_explicit_linkname.xhtml"
 		     (funcall cl-blog-generator::*id-generator-fn* blog-post)))))))
+
+
+
+(deftest test-%publish-draft-and-%publish-updated-post-first ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (multiple-value-bind (output-path blog-post)
+	  (cl-blog-generator::%publish-draft (draft-path "first"))
+	(declare (ignore blog-post))
+	(is (cl-fad:file-exists-p output-path))
+
+	(multiple-value-bind (output-path blog-post)
+	    (cl-blog-generator::%publish-updated-post output-path)
+	  (let ((post-updated ;; this could cause problems testing at midnight
+		 (cl-blog-generator::decode-local-date (get-universal-time))))
+	    (is (cl-fad:file-exists-p output-path))
+	    (is (string= "My First Blog Post"
+			 (cl-blog-generator::blog-post-title blog-post)))
+	    (is (string= "my_first_blog_post"
+			 (cl-blog-generator::blog-post-filename blog-post)))
+	    (is (equalp '(24 02 2009)
+			(cl-blog-generator::decode-date
+			 (cl-blog-generator::blog-post-when blog-post))))
+	    (is (equalp post-updated
+			(cl-blog-generator::decode-date
+			 (cl-blog-generator::blog-post-updated blog-post))))
+	    (is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
+			 (funcall cl-blog-generator::*id-generator-fn* blog-post)))
+
+	    (multiple-value-bind (title when updated tags linkname synopsis)
+		(cl-blog-generator::%parse-post-info output-path)
+	      (is (string= title "My First Blog Post"))
+	      (is (equalp '(24 02 2009) when))
+	      (is (equalp '("lisp" "blog") tags))
+	      (is (string= linkname "my_first_blog_post"))
+	      (is (equalp post-updated updated))
+	      (is (synopsis=
+		   "<p>My first post.  Mainly to have something to use in developing the code.</p>"
+		   synopsis)))))))))
+
+
+(deftest test-%publish-draft-and-%publish-updated-post-second ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (multiple-value-bind (output-path blog-post)
+	  (cl-blog-generator::%publish-draft (draft-path "second"))
+	(declare (ignore blog-post))
+	(is (cl-fad:file-exists-p output-path))
+
+	(multiple-value-bind (output-path blog-post)
+	    (cl-blog-generator::%publish-updated-post output-path)
+	  (is (cl-fad:file-exists-p output-path))
+	  (is (string= "My Second Blog Post"
+		       (cl-blog-generator::blog-post-title blog-post)))
+	  (is (string= "a_second_blog_post_with_an_explicit_linkname"
+		       (cl-blog-generator::blog-post-filename blog-post)))
+	  (is (equalp '(26 02 2009)
+		      (cl-blog-generator::decode-date
+		       (cl-blog-generator::blog-post-when blog-post))))
+	  (is (equalp '(27 02 2009)
+		      (cl-blog-generator::decode-date
+		       (cl-blog-generator::blog-post-updated blog-post))))
+	  (is (string= "http://hugoduncan.org/blog/post/2009/a_second_blog_post_with_an_explicit_linkname.xhtml"
+		       (funcall cl-blog-generator::*id-generator-fn* blog-post)))
+
+
+	  (multiple-value-bind (title when updated tags linkname synopsis)
+	      (cl-blog-generator::%parse-post-info output-path)
+	    (is (string= title "My Second Blog Post"))
+	    (is (equalp '(26 02 2009) when))
+	    (is (equalp '("lisp" "blog") tags))
+	    (is (string= linkname "a_second_blog_post_with_an_explicit_linkname"))
+	    (is (equalp '(27 02 2009) updated))
+	    (is (synopsis=
+		 "<p>My second post.  With an explicit linkname, and an updated tag.</p>"
+		 synopsis))))))))
 
 
 (deftest test-%adjacent-posts ()

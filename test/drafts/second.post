@@ -3,10 +3,12 @@
 <head>
   <title>My Second Blog Post</title>
   <when year="2009" month="02" day="26"/>
+  <updated year="2009" month="02" day="27"/>
   <tag>blog</tag>
   <tag>lisp</tag>
+  <linkname>a_second_blog_post_with_an_explicit_linkname</linkname>
 </head>
 <body>
-<p>My second post.</p>
+<p>My second post.  With an explicit linkname, and an updated tag.</p>
 </body>
 </html>
