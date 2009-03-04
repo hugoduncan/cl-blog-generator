@@ -2,6 +2,7 @@
   (:use #:common-lisp)
   (:nicknames #:blogen)
   (:export #:publish-draft
+	   #:publish-updated-post
 	   #:generate-site
 	   #:set-environment
 	   #:configure

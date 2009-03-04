@@ -254,10 +254,28 @@
 	(cl-blog-generator::%generate-site)
 	(is (cl-fad:file-exists-p index-page))))))
 
+(deftest test-generate-site ()
+  (with-fixture delete-all-fixture
+    (cl-blog-generator::publish-draft (draft-path "first"))
+    (cl-blog-generator::publish-draft (draft-path "second"))
+    (cl-blog-generator::publish-draft (draft-path "third"))
+    (destructuring-bind (url path) (cl-blog-generator::generate-site)
+      (is (stringp url))
+      (is (stringp path))
+      (with-test-db
+	(let ((index-page
+	       (cl-blog-generator::url-for
+		(cl-blog-generator::index-page))))
+	  (is (string= url index-page)))))))
+
 (deftest test-publish-draft-first ()
   (with-fixture delete-all-fixture
-    (destructuring-bind (pf sf)
+    (destructuring-bind (pf sf url path)
 	(publish-draft (draft-path "first") :generate-site nil)
+      (is (stringp pf))
+      (is (stringp sf))
+      (is (stringp url))
+      (is (stringp path))
       (let ((sfe (format nil "~Apost/2009/my_first_blog_post.xhtml" cl-blog-generator::*site-path*))
 	    (pfe (format nil "~Apost/2009/my_first_blog_post.post" cl-blog-generator::*published-path*)))
 	(is (string= sfe (namestring sf)))

@@ -241,6 +241,9 @@
   (declare (ignore index-page))
   (make-pathname :name "index.xhtml" :defaults *site-path*))
 
+(defmethod path-for ((index-page index-page))
+  (format nil "~Aindex.xhtml" *blog-root-path*))
+
 (defun index-page ()
   "Obtain the singleton index page."
   (or (first (elephant:get-instances-by-class 'index-page))
@@ -415,7 +418,10 @@ the path to the published file and the site path."
       (if generate-site
 	  (generate-site)
 	  (generate-page blog-post))
-      (list (namestring output-path) (site-file-path-for blog-post)))))
+      (list (namestring output-path)
+	    (namestring (site-file-path-for blog-post))
+	    (url-for blog-post)
+	    (path-for blog-post)))))
 
 ;;; Republishing uses the "updated" element in the "head" to set the updated time
 ;;; on the post.  If no "updated" is present, then one is added eith the current
@@ -429,7 +435,10 @@ the path to the published file and the site path."
       (if generate-site
 	  (generate-site)
 	  (generate-page blog-post))
-      (list (namestring output-path) (site-file-path-for blog-post)))))
+      (list (namestring output-path)
+	    (namestring (site-file-path-for blog-post))
+	    (url-for blog-post)
+	    (path-for blog-post)))))
 
 ;;; Publish a draft. This puts the draft into publish, and creates database meta
 ;;; info for it. Returns the published file path and the blog-post metadata.
@@ -670,7 +679,9 @@ then this code will not be executed)."
 (defun generate-site ()
   "Generate all dirty content for the site. Creates a database connection."
   (with-open-store ()
-    (%generate-site)))
+    (%generate-site)
+    (list (url-for (index-page))
+	  (path-for (index-page)))))
 
 ;;;## Output functions
 ;;; Used to output content
