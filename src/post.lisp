@@ -1,16 +1,12 @@
 ;;;; Blog generator
 
+;;; Generate a blog site from input posts.
+
 ;;; TODO
-;;; fix date on generated page
-;;; add updated date (possibly in db and published file)
-;;; atom feed
 ;;; tag links and pages
 ;;; comments
 
-;;; Generate a blog site from input posts.
 (in-package #:cl-blog-generator)
-
-
 
 ;;;# Configuration
 ;;; These are the special variables used to control the blog generator's behaviour.

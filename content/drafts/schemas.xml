@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<locatingRules xmlns="http://thaiopensource.com/ns/locating-rules/1.0">
-  <uri pattern="*.post" uri="../../dtd/xhtml-post.rnc"/>
-  <namespace ns="http://hugoduncan.org/xmlns/post"
-	     uri="../../dtd/xhtml-post.rnc"/>
-</locatingRules>
