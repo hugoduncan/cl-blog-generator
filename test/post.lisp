@@ -242,6 +242,33 @@
 	      (is (eql blog-post2 next )))
 	    ))))))
 
+;; (deftest test-%adjacent-posts-same-date ()
+;;   (with-fixture delete-all-fixture
+;;     (with-test-db
+;;       (multiple-value-bind (output-path blog-post1)
+;; 	  (cl-blog-generator::%publish-draft (draft-path "third"))
+;; 	(declare (ignore output-path))
+;; 	(multiple-value-bind (output-path blog-post2)
+;; 	    (cl-blog-generator::%publish-draft (draft-path "fith"))
+;; 	  (declare (ignore output-path))
+;; 	  (multiple-value-bind (output-path blog-post3)
+;; 	      (cl-blog-generator::%publish-draft (draft-path "sixth"))
+;; 	    (declare (ignore output-path))
+;; 	    (format *debug-io* "~A ~A ~A~%" blog-post1 blog-post2 blog-post3)
+;; 	    (multiple-value-bind (prior next)
+;; 		(cl-blog-generator::%adjacent-posts blog-post1)
+;; 	      (is (null prior))
+;; 	      (is (eql next blog-post3)))
+;; 	    (multiple-value-bind (prior next)
+;; 		(cl-blog-generator::%adjacent-posts blog-post2)
+;; 	      (is (eql blog-post3 prior))
+;; 	      (is (null next)))
+;; 	    (multiple-value-bind (prior next)
+;; 		(cl-blog-generator::%adjacent-posts blog-post3)
+;; 	      (is (eql blog-post1 prior))
+;; 	      (is (eql blog-post2 next )))
+;; 	    ))))))
+
 (deftest test-%generate-site ()
   (with-fixture delete-all-fixture
     (cl-blog-generator::publish-draft (draft-path "first"))

@@ -194,7 +194,7 @@
 (defgeneric url-for (generated-content)
   (:documentation "Url for the object on the site."))
 
-(defgeneric link-for (generated-content)
+(defgeneric link-for (generated-content &key url)
   (:documentation "Output a link for the object."))
 
 (defgeneric relative-path-for (generated-content)
@@ -288,6 +288,13 @@
 	    (%sanitise-title (slot-value blog-post 'filename))
 	    (%sanitise-title (slot-value blog-post 'title)))))
 
+(defmethod print-object ((object blog-post) stream)
+  "Print a blog post instance showing date and filename"
+  (print-unreadable-object (object stream :type t)
+    (with-slots (filename when) object
+      (format stream "(~{~A~^-~}) ~A " (decode-date when) filename))
+    (format stream " oid:~D" (elephant::oid object))))
+
 (defmethod relative-path-for ((blog-post blog-post))
   "Relative path for a blog post"
   (list "post" (format nil "~A" (blog-post-year blog-post))))
@@ -321,11 +328,11 @@
 	  (relative-namestring-for blog-post)
 	  (blog-post-filename blog-post)))
 
-(defmethod link-for ((blog-post blog-post))
+(defmethod link-for ((blog-post blog-post) &key url)
   (cxml:with-element "span"
     (cxml:attribute "class" "post-link")
     (cxml:with-element "a"
-      (cxml:attribute "href" (path-for blog-post))
+      (cxml:attribute "href" (or url (path-for blog-post)))
       (cxml:text (blog-post-title blog-post)))))
 
 (defun blog-post-year (blog-post)
@@ -379,18 +386,23 @@
 (defun %adjacent-posts (blog-post)
   "Return post before and after the given post."
   (assert blog-post)
-  (elephant:with-btree-cursor (cursor (elephant:find-inverted-index 'blog-post 'when))
+  (elephant:with-btree-cursor
+      (cursor (elephant:find-inverted-index 'blog-post 'when))
     (let (has-pair key value prior next
 		   (when (blog-post-when blog-post))
 		   (oid (elephant::oid blog-post)))
       (multiple-value-setq (has-pair key value)
 	(elephant:cursor-set cursor when))
       (assert has-pair)
+      (loop
+	 while (and has-pair (not (= oid value)))
+	 do (multiple-value-setq (has-pair key value) (elephant:cursor-next cursor)))
       (assert (= oid value))
       (multiple-value-setq (has-pair key value) (elephant:cursor-prev cursor))
       (if has-pair
 	  (setf prior (elephant::controller-recreate-instance elephant:*store-controller* value)))
       (multiple-value-setq (has-pair key value) (elephant:cursor-next cursor))
+      (assert (= oid value))
       (multiple-value-setq (has-pair key value) (elephant:cursor-next cursor))
       (if has-pair
 	  (setf next (elephant::controller-recreate-instance elephant:*store-controller* value)))
@@ -816,7 +828,10 @@ then this code will not be executed)."
 	     (tapped (klacks:make-tapping-source template output)))
 	(cxml:with-xml-output output
 	  (flet ((output-post-link (blog-post)
-		   (link-for blog-post)
+		   (link-for blog-post
+			     :url (enough-namestring
+				   (site-file-path-for blog-post)
+				   (site-file-path-for index-page)))
  		   (output-post-synopsis blog-post output)))
 	    (%find-div-with-id tapped "posts")
 	    (cxml:with-element "div"
