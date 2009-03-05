@@ -1,0 +1,34 @@
+<html xmlns="http://hugoduncan.org/xmlns/post">
+<head>
+  <title>Blog Generator Configuration</title>
+  <tag>lisp</tag>
+<when day="4" month="3" year="2009"/><linkname>blog_generator_configuration</linkname></head>
+<body>
+<p>The blog generator is intended to be quite flexible, within the design constraints, which has lead to a large number of possible configurations, both on the lisp side, and for Emacs.  Drafts can be written using any editor, but I shall describe use with Emacs.  The package has only been tested with SBCL, but should work with any common lisp implentation.</p>
+
+<h2>Prerequisites</h2>
+<p>The blog generator uses <a href="http://common-lisp.net/project/cxml/">CXML</a>, <a href="http://common-lisp.net/project/elephant/">Elephant</a>, <a href="http://weitz.de/cl-fad/">CL-FAD</a>, <a href="http://common-lisp.net/project/local-time/">Local-Time</a>, and <a href="http://common-lisp.net/project/stefil/">Stefil</a> for testing.  I am using clbuild to obtain these.</p>
+<p>For Emacs, I use <a href="http://www.thaiopensource.com/nxml-mode/">nXML mode</a>.</p>
+
+<h2>Configuration Environments</h2>
+<p>A configuration switching method is included in the package, but it's use is optional, and as is usual for lisp, configuration is through special variables.</p>
+<p>For an example of using the configuration environments, look at the <code>config.lisp</code> file loaded by the <code>my-blog.asd</code> system.  This defines the three environments that I use, <code>:test</code>, <code>:development</code>, and <code>:production</code>.  Configurations are defined using <code>SET-ENVIRONMENT</code> and activated with <code>CONFIGURE</code>.</p>
+
+<h2>Basic Configuration</h2>
+<p>The first configuration required is the choice of file system locations for the published posts (<code>*PUBLISHED-PATH*</code>), the generated web pages(<code>*SITE-PATH*</code>) and the page templates (<code>*TEMPLATE-PATH*</code>).   Drafts can exist anywhere, and are not tracked by the generator.</p>
+<p>Next, the web paths need to be configured.  The path of the blog's index file relative to the site root is required (<code>*BLOG-ROOT-PATH*</code>), as is the domain of the site (<code>*BLOG-DOMAIN*</code>), in order for it to be used in the Atom feed.</p>
+<p>Finally, the database connection expression is required (<code>*BLOG-DB-SPEC*</code>).  Please refer to the Elephant documentation for your choices here.  I use postgres, but it should work with the BDB backend as well.</p>
+
+<h2>Templates</h2>
+<p>The site requires three templates in <code>*TEMPLATE-PATH*</code>; for the index file (<code>index.html</code>), for the posts (<code>post.xhtml</code>) and for the Atom feed (<code>atom.xml</code>).  The templates are very simple - each div or span with a recognised id has content injected into it.  The recoginised id's are:</p>
+<ul>
+  <li><code>posts</code> - replaced with the current post synopses, and links to the posts</li>
+  <li><code>post</code> - replaced with the current post's content</li>
+  <li><code>post-title</code> - replaced with the current post's title</li>
+  <li><code>post-when</code> - replaced with the current post's published date</li>
+  <li><code>post-update</code> - replaced with the current post's updated date</li>
+</ul>
+<p>For the Atom feed, the <code>updated</code> element is filled out correctly, and the posts are automatically inserted, ie. there are no special id's.</p>
+
+</body>
+</html>
