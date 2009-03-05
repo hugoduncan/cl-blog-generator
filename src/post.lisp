@@ -576,6 +576,13 @@ when (day month year), updated (day month year), tags, linkname, and synopsis."
       (when next
 	(setf (dirty next) t)))))
 
+
+(defun %mark-all-dirty ()
+  "Mark everything as dirty."
+  (setf (dirty (index-page)) t)
+  (setf (dirty (atom-feed)) t)
+  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'blog-post))
+
 ;;; Publish a draft by copying it to the published path, adding the
 ;;; "post-when" element.  This ensures that all meta-data is in the
 ;;; published post, removing any reliance on maintaing the metadata
@@ -669,6 +676,7 @@ then this code will not be executed)."
 ;;;# Site Generation
 (defun %generate-site ()
   "Generate all dirty content for the site.  Assumes an existing database connection."
+
   (let ((dirty-posts (%dirty-posts))
 	(index-page (index-page))
 	(atom-feed (atom-feed)))
@@ -684,9 +692,13 @@ then this code will not be executed)."
 	  (when (dirty atom-feed)
 	    (generate-page atom-feed :collection recent-posts))))))
 
-(defun generate-site ()
-  "Generate all dirty content for the site. Creates a database connection."
+(defun generate-site (&key all)
+  "Generate all dirty content for the site. Creates a database connection.  When
+passed :ALL, will mark everything as dirty and regenerate (useful if you change
+the templates)."
   (with-open-store ()
+    (when all
+      (%mark-all-dirty))
     (%generate-site)
     (list (url-for (index-page))
 	  (path-for (index-page)))))
