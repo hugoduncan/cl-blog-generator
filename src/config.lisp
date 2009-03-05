@@ -6,8 +6,8 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *development-environment*
     '((:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog_dev" "duncan" "")))
-      (:blog-domain . "localhost")
-      (:blog-root-path . "/blog/") ;; should end in /
+      (:blog-domain . "hugoduncan.github.com")
+      (:blog-root-path . "/cl-blog-generator/") ;; should end in /
       (:site-path . #p"/Users/duncan/projects/blog/content/site/")
       (:published-path . #p"/Users/duncan/projects/blog/content/published/")
       (:template-path . #p"/Users/duncan/projects/blog/content/template/"))
