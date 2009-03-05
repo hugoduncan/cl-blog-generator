@@ -7,7 +7,7 @@
   (defparameter *development-environment*
     '((:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog_dev" "duncan" "")))
       (:blog-domain . "hugoduncan.github.com")
-      (:blog-root-path . "/cl-blog-generator/") ;; should end in /
+      (:blog-root-path . "/cl-blog-generator/content/site/") ;; should end in /
       (:site-path . #p"/Users/duncan/projects/blog/content/site/")
       (:published-path . #p"/Users/duncan/projects/blog/content/published/")
       (:template-path . #p"/Users/duncan/projects/blog/content/template/"))
