@@ -151,7 +151,7 @@
    (lambda (result)
      (destructuring-bind (output value) result
        (when value
-	 (let* ((res (read-from-string value))
+	 (let* ((res (first (read-from-string value)))
 		(published-path (nth 0 res))
 		(site-path (nth 1 res))
 		(url (nth 2 res))
@@ -195,7 +195,8 @@
      (lambda (result)
        (destructuring-bind (output value) result
 	 (when value
-	   (let* ((url (nth 0 res))
+	   (let* ((res (first (read-from-string value)))
+		  (url (nth 0 res))
 		  (path (nth 1 res)))
 	   (message "Url is %s" url)
 	   (message "Path is %s" path)
