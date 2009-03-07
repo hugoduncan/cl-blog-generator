@@ -148,9 +148,11 @@
      for end-element = (multiple-value-list (klacks:find-event source :end-element))
      while end-element
      for (key ns name) = end-element
+     while key
      do
        (when (string= lname name)
-	 (return nil))))
+	 (return nil))
+       (klacks:consume source)))
 
 (defun %find-div-or-span-with-an-id (template)
   "Find the next div or span element in the TEMPLATE which has an id."
@@ -552,7 +554,10 @@ when (day month year), updated (day month year), tags, linkname, and synopsis."
 		(return nil)))))
 	(klacks:find-element post *post-body*)
 	(klacks:find-element post "p")
-	(let* ((output (cxml:make-octet-vector-sink))
+	(let* ((output (cxml:make-octet-vector-sink
+			:canonical nil
+			:indentation nil
+			:omit-xml-declaration-p t))
 	       (tapped (klacks:make-tapping-source post output)))
 	  (%find-end-element tapped "p")
 	  (klacks:consume tapped)
