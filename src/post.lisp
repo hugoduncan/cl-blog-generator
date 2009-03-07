@@ -427,7 +427,8 @@ the path to the published file and the site path."
 	(%publish-draft (pathname path))
       (if generate-site
 	  (generate-site)
-	  (generate-page blog-post))
+	  (multiple-value-bind (prior next) (%adjacent-posts blog-post)
+	    (generate-page blog-post :prior prior :next next)))
       (list (namestring output-path)
 	    (namestring (site-file-path-for blog-post))
 	    (url-for blog-post)
