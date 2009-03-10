@@ -60,5 +60,6 @@
 <!ENTITY % Post.updated.qname "%Post.pfx;updated" >
 <!ENTITY % Post.linkname.qname "%Post.pfx;linkname" >
 <!ENTITY % Post.tag.qname "%Post.pfx;tag" >
+<!ENTITY % Post.template.qname "%Post.pfx;template" >
 
 

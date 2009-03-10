@@ -1,11 +1,11 @@
 
 
 
-<!-- Model for our module - how our dtd patches into xhtml -->
+<!-- Model for our module - how our dtd patches into xhtml.  This isn't really explicit - but should be ok -->
 
 <!ENTITY % HeadOpts.mix
      "( %script.qname; | %style.qname; | %meta.qname;
-      | %link.qname; | %object.qname; | %Post.tag.qname; | %Post.when.qname; | %Post.updated.qname; | %Post.linkname.qname; )*"
+      | %link.qname; | %object.qname; | %Post.tag.qname; | %Post.when.qname; | %Post.updated.qname; | %Post.linkname.qname; | %Post.template.qname; )*"
 >
 
 

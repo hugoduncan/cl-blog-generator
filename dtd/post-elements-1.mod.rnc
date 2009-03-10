@@ -18,3 +18,5 @@ tag.attlist &=
   attribute id { xsd:ID }?
 linkname = element linkname { linkname.attlist, text }
 linkname.attlist &= empty
+template = element template { template.attlist, text }
+template.attlist &= empty

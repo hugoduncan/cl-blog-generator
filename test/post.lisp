@@ -31,6 +31,8 @@
     (elephant:drop-instances
      (elephant:get-instances-by-class (find-class 'cl-blog-generator::blog-post)))
     (elephant:drop-instances
+     (elephant:get-instances-by-class (find-class 'cl-blog-generator::page)))
+    (elephant:drop-instances
      (elephant:get-instances-by-class 'cl-blog-generator::index-page))
     (elephant:drop-instances
      (elephant:get-instances-by-class 'cl-blog-generator::atom-feed))
@@ -40,9 +42,9 @@
      (elephant:get-instances-by-class 'cl-blog-generator::generated-content)
      )))
 
-(defun draft-path (filename)
+(defun draft-path (filename &key (type "post"))
   (merge-pathnames
-   (make-pathname :directory '(:relative ".." "drafts") :name filename :type "post")
+   (make-pathname :directory '(:relative ".." "drafts") :name filename :type type)
    *site-path*))
 
 (deftest test-draft-path ()
@@ -67,7 +69,7 @@
 
 (deftest test-%parse-post-info-first ()
   (with-fixture test-environment-fixture
-    (multiple-value-bind (title when updated tags linkname description synopsis)
+    (multiple-value-bind (title when updated tags linkname description synopsis template)
 	(cl-blog-generator::%parse-post-info (draft-path "first"))
       (is (string= title "My First Blog Post"))
       (is (equalp '(24 02 2009) when))
@@ -76,11 +78,11 @@
       (is (not updated))
       (is (not description))
       (is (synopsis= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
-      )))
+      (is (not template)))))
 
 (deftest test-%parse-post-info-second ()
   (with-fixture test-environment-fixture
-    (multiple-value-bind (title when updated tags linkname description synopsis)
+    (multiple-value-bind (title when updated tags linkname description synopsis template)
 	(cl-blog-generator::%parse-post-info (draft-path "second"))
       (is (string= title "My Second Blog Post"))
       (is (equalp '(26 02 2009) when))
@@ -89,7 +91,21 @@
       (is (equalp '(27 02 2009) updated))
       (is (string= description  "A description"))
       (is (synopsis= "<p>My second post.  With an explicit linkname, and an updated tag.</p>" synopsis))
-      )))
+      (is (not template)))))
+
+
+(deftest test-%parse-post-info-first-page ()
+  (with-fixture test-environment-fixture
+    (multiple-value-bind (title when updated tags linkname description synopsis template)
+	(cl-blog-generator::%parse-post-info (draft-path "first" :type "page"))
+      (is (string= title "My First Template Page"))
+      (is (null when))
+      (is (equalp '("lisp") tags))
+      (is (string= "first_page" linkname))
+      (is (not updated))
+      (is (not description))
+      (is (synopsis= "<p>My first non blog page.</p>" synopsis))
+      (is (string= template "page")))))
 
 
 (deftest test-%publish-draft-first ()
@@ -99,13 +115,13 @@
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(is (cl-fad:file-exists-p output-path))
 	(is (string= "My First Blog Post"
-		     (cl-blog-generator::blog-post-title blog-post)))
+		     (cl-blog-generator::content-title blog-post)))
 	(is (string= "my_first_blog_post"
-		     (cl-blog-generator::blog-post-filename blog-post)))
+		     (cl-blog-generator::content-filename blog-post)))
 	(is (equalp '(24 02 2009)
 		    (cl-blog-generator::decode-date
-		     (cl-blog-generator::blog-post-when blog-post))))
-	(is (null (cl-blog-generator::blog-post-updated blog-post)))
+		     (cl-blog-generator::content-when blog-post))))
+	(is (null (cl-blog-generator::content-updated blog-post)))
 	(is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
 		     (funcall cl-blog-generator::*id-generator-fn* blog-post)))
 
@@ -130,17 +146,37 @@
 	  (cl-blog-generator::%publish-draft (draft-path "second"))
 	(is (cl-fad:file-exists-p output-path))
 	(is (string= "My Second Blog Post"
-		     (cl-blog-generator::blog-post-title blog-post)))
+		     (cl-blog-generator::content-title blog-post)))
 	(is (string= "a_second_blog_post_with_an_explicit_linkname"
-		     (cl-blog-generator::blog-post-filename blog-post)))
+		     (cl-blog-generator::content-filename blog-post)))
 	(is (equalp '(26 02 2009)
 		    (cl-blog-generator::decode-date
-		     (cl-blog-generator::blog-post-when blog-post))))
+		     (cl-blog-generator::content-when blog-post))))
 	(is (equalp '(27 02 2009)
 		    (cl-blog-generator::decode-date
-		     (cl-blog-generator::blog-post-updated blog-post))))
+		     (cl-blog-generator::content-updated blog-post))))
 	(is (string= "http://hugoduncan.org/blog/post/2009/a_second_blog_post_with_an_explicit_linkname.xhtml"
 		     (funcall cl-blog-generator::*id-generator-fn* blog-post)))))))
+
+
+(deftest test-%publish-draft-first-page ()
+  (let ((post-updated ;; this could cause problems testing at midnight
+	  (cl-blog-generator::decode-local-date (get-universal-time))))
+    (with-fixture delete-all-fixture
+      (with-test-db
+	(multiple-value-bind (output-path content)
+	    (cl-blog-generator::%publish-draft (draft-path "first" :type "page"))
+	  (is (cl-fad:file-exists-p output-path))
+	  (is (string= "My First Template Page"
+		       (cl-blog-generator::content-title content)))
+	  (is (string= "first_page"
+		       (cl-blog-generator::content-filename content)))
+	  (is (equalp post-updated
+		      (cl-blog-generator::decode-date
+		       (cl-blog-generator::content-when content))))
+	  (is (null (cl-blog-generator::content-updated content)))
+	  (is (string= "http://hugoduncan.org/blog/page/first_page.xhtml"
+		       (funcall cl-blog-generator::*id-generator-fn* content))))))))
 
 
 
@@ -158,15 +194,15 @@
 		 (cl-blog-generator::decode-local-date (get-universal-time))))
 	    (is (cl-fad:file-exists-p output-path))
 	    (is (string= "My First Blog Post"
-			 (cl-blog-generator::blog-post-title blog-post)))
+			 (cl-blog-generator::content-title blog-post)))
 	    (is (string= "my_first_blog_post"
-			 (cl-blog-generator::blog-post-filename blog-post)))
+			 (cl-blog-generator::content-filename blog-post)))
 	    (is (equalp '(24 02 2009)
 			(cl-blog-generator::decode-date
-			 (cl-blog-generator::blog-post-when blog-post))))
+			 (cl-blog-generator::content-when blog-post))))
 	    (is (equalp post-updated
 			(cl-blog-generator::decode-date
-			 (cl-blog-generator::blog-post-updated blog-post))))
+			 (cl-blog-generator::content-updated blog-post))))
 	    (is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
 			 (funcall cl-blog-generator::*id-generator-fn* blog-post)))
 
@@ -195,15 +231,15 @@
 	    (cl-blog-generator::%publish-updated-post output-path)
 	  (is (cl-fad:file-exists-p output-path))
 	  (is (string= "My Second Blog Post"
-		       (cl-blog-generator::blog-post-title blog-post)))
+		       (cl-blog-generator::content-title blog-post)))
 	  (is (string= "a_second_blog_post_with_an_explicit_linkname"
-		       (cl-blog-generator::blog-post-filename blog-post)))
+		       (cl-blog-generator::content-filename blog-post)))
 	  (is (equalp '(26 02 2009)
 		      (cl-blog-generator::decode-date
-		       (cl-blog-generator::blog-post-when blog-post))))
+		       (cl-blog-generator::content-when blog-post))))
 	  (is (equalp '(27 02 2009)
 		      (cl-blog-generator::decode-date
-		       (cl-blog-generator::blog-post-updated blog-post))))
+		       (cl-blog-generator::content-updated blog-post))))
 	  (is (string= "http://hugoduncan.org/blog/post/2009/a_second_blog_post_with_an_explicit_linkname.xhtml"
 		       (funcall cl-blog-generator::*id-generator-fn* blog-post)))
 
@@ -309,6 +345,21 @@
       (is (stringp path))
       (let ((sfe (format nil "~Apost/2009/my_first_blog_post.xhtml" cl-blog-generator::*site-path*))
 	    (pfe (format nil "~Apost/2009/my_first_blog_post.post" cl-blog-generator::*published-path*)))
+	(is (string= sfe (namestring sf)))
+	(is (string= pfe (namestring pf)))
+	(is (cl-fad:file-exists-p sfe))
+	(is (cl-fad:file-exists-p pfe))))))
+
+(deftest test-publish-draft-first-page ()
+  (with-fixture delete-all-fixture
+    (destructuring-bind (pf sf url path)
+	(publish-draft (draft-path "first" :type "page") :generate-site nil)
+      (is (stringp pf))
+      (is (stringp sf))
+      (is (stringp url))
+      (is (stringp path))
+      (let ((sfe (format nil "~Apage/first_page.xhtml" cl-blog-generator::*site-path*))
+	    (pfe (format nil "~Apage/first_page.page" cl-blog-generator::*published-path*)))
 	(is (string= sfe (namestring sf)))
 	(is (string= pfe (namestring pf)))
 	(is (cl-fad:file-exists-p sfe))

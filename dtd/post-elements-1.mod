@@ -21,3 +21,5 @@
 <!ELEMENT %Post.linkname.qname; (#PCDATA) >
 <!ATTLIST %Post.linkname.qname; >
 
+<!ELEMENT %Post.template.qname; (#PCDATA) >
+<!ATTLIST %Post.template.qname; >

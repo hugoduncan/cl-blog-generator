@@ -26,8 +26,28 @@
 ;;; Optional configuration for customising the behaviour of the system
 (defvar *id-generator-fn* nil
   "Function used to generate a unique id for an item.")
-(defvar *relative-path-fn* nil
+
+(defvar *blog-post-relative-path-fn* nil
   "The function used to generate the path of content relative to *BLOG-ROOT-PATH* or *PUBLISHED-PATH*")
+(defvar *page-relative-path-fn* nil
+  "The function used to generate the path of content relative to *BLOG-ROOT-PATH* or *PUBLISHED-PATH*")
+
+(defvar *blog-post-path* '("post")
+  "Default path list for BLOG-POST content.")
+(defvar *page-path* '("page")
+  "Default path list for PAGE content.")
+
+(defvar *blog-post-template* "post"
+  "Template to use for each blog-post")
+
+(defvar *default-template* "post"
+  "Template to use if none specified")
+
+(defvar *templated-content-file-types*
+  '((page . "page")
+    (blog-post . "post"))
+  "Default file extensions for the published content.")
+
 
 ;;; Tags used for identifying elements
 (defparameter *xhtml-xmlns* "http://www.w3.org/1999/xhtml")
@@ -44,6 +64,7 @@
 (defparameter *post-description* "description")
 (defparameter *post-name* "name")
 (defparameter *post-content* "content")
+(defparameter *post-template* "template")
 (defparameter *element-id* "id")
 
 (defparameter *post-content-id* "post"
@@ -136,6 +157,17 @@
        (string= element target)
        (string= ns *post-xmlns*)))
 
+;;; Functions to control output of tapped
+(defun %peek-without-tap (tapped-source)
+  "Peek without triggering the output of a TAPPED-SOURCE"
+  (setf (cxml::seen-event-p tapped-source) t)
+  (klacks:peek tapped-source))
+
+(defun %consume-with-tap (tapped-source)
+  "Consume current event, ensuring it will be seen by the tapped output"
+  (setf (cxml::seen-event-p tapped-source) nil)
+  (klacks:consume tapped-source))
+
 ;;; Parse atrributes into an a-list
 (defun %capture-attributes (source)
   "Capture the attributes od the element as an a-list."
@@ -180,8 +212,9 @@
 	 (return nil))
        (klacks:consume source)))
 
-(defun %find-div-or-span-with-an-id (template)
-  "Find the next div or span element in the TEMPLATE which has an id."
+;;; Finds elements that should be replaced in the template.
+(defun %find-element-to-process (template)
+  "Find the next div, span, or a element in the TEMPLATE which has an id or a class."
   (loop
      with id = nil
      until id
@@ -198,6 +231,8 @@
      finally
        (return id)))
 
+
+
 ;;; A debugging function to dump the current event
 (defun %format-peek (source)
   "Dump the current event."
@@ -206,6 +241,8 @@
 
 ;;;# Generated Content Protocol
 
+(defgeneric generate (page)
+  (:documentation "Generate a content page"))
 
 (defgeneric generate-page (generated-content &key collection links &allow-other-keys)
   (:documentation "Generate the requested content."))
@@ -240,6 +277,13 @@
 (defun base-url ()
   "Base url-for the blog."
   (format nil "http://~A~A" *blog-domain* *blog-root-path*))
+
+(defun relative-directory-for (item)
+  (append (list :relative) (funcall *page-relative-path-fn* item)))
+
+(defun relative-namestring-for (item)
+  (format nil "~{~A/~}" (funcall *page-relative-path-fn* item)))
+
 
 ;;;# Database
 
@@ -294,25 +338,26 @@
   (:metaclass elephant:persistent-metaclass)
   (:documentation "Page for content matching a tag."))
 
-;;;### Blog post
-(defclass blog-post (generated-content)
-  ((filename :initarg :filename :reader blog-post-filename :index t)
-   (title :initarg :title :accessor blog-post-title :index t)
-   (tags :initarg :tags :initform nil :accessor blog-post-tags :index t)
-   (when :initarg :when :initform nil :reader blog-post-when
+;;;### Templated content
+;;; All content that uses a template to merge user written content.
+(defclass templated-content (generated-content)
+  ((filename :initarg :filename :reader content-filename :index t)
+   (title :initarg :title :accessor content-title :index t)
+   (tags :initarg :tags :initform nil :accessor content-tags :index t)
+   (when :initarg :when :initform nil :reader content-when
 	 :type unsigned-byte :index t
 	 :documentation "When post was originally written.")
-   (updated :initarg :updated :initform nil :accessor blog-post-updated
+   (updated :initarg :updated :initform nil :accessor content-updated
 	    :type unsigned-byte :index t
 	    :documentation "Last update time")
-   (description :initarg :description :initform nil :accessor blog-post-description)
-   (synopsis :initarg :synopsis :initform nil :accessor blog-post-synopsis))
+   (description :initarg :description :initform nil :accessor content-description)
+   (synopsis :initarg :synopsis :initform nil :accessor content-synopsis))
   (:metaclass elephant:persistent-metaclass)
-  (:documentation "Metadata for blog-posts"))
+  (:documentation "Metadata for templated user content"))
 
 (defmethod shared-initialize :after
-    ((blog-post blog-post) slot-names &key &allow-other-keys)
-  (with-slots (filename title when description synopsis) blog-post
+    ((templated-content templated-content) slot-names &key &allow-other-keys)
+  (with-slots (filename title when description synopsis) templated-content
     ;; create a sanitised filename
     (setf filename
 	  (if filename
@@ -320,11 +365,76 @@
 	      (%sanitise-title title)))
     ;; default when to current day
     (unless when
-      (setf when (decode-local-date (get-universal-time))))
+      (setf when (encode-date (decode-local-date (get-universal-time)))))
     ;; create a description
-    (unless (and (slot-boundp blog-post 'description) description)
+    (unless (and (slot-boundp templated-content 'description) description)
       (when synopsis
 	(setf description (%sanitise-synopsis synopsis))))))
+
+
+(defmethod published-file-path-for ((templated-content templated-content))
+  "Find the publish file path for the specified TEMPLATED-CONTENT."
+  (let ((type (cdr (assoc (type-of templated-content)
+			  *templated-content-file-types*))))
+    (assert type)
+    (ensure-directories-exist
+     (merge-pathnames
+      (make-pathname :directory (relative-directory-for templated-content)
+		     :name (content-filename templated-content)
+		     :type type)
+      *published-path*))))
+
+(defmethod site-file-path-for ((templated-content templated-content))
+  "Find the site file path for the specified TEMPLATED-CONTENT."
+  (ensure-directories-exist
+   (merge-pathnames
+    (make-pathname :directory (relative-directory-for templated-content)
+		   :name (content-filename templated-content)
+		   :type "xhtml") *site-path*)))
+
+
+(defmethod path-for ((templated-content templated-content))
+  (format nil "~A~A~A.xhtml" *blog-root-path*
+	  (relative-namestring-for templated-content)
+	  (content-filename templated-content)))
+
+(defun content-year (templated-content)
+  "Returns the year of the blog post."
+  (destructuring-bind (day month year) (decode-date (content-when templated-content))
+    (declare (ignore day month))
+    (values year)))
+
+
+;;;### Page
+;;; A user written page that is meant to be updated over time, and is not a blog post
+(defclass page (templated-content)
+  ((template :initarg :template :initform nil :reader content-template))
+  (:metaclass elephant:persistent-metaclass)
+  (:documentation "Metadata for pages"))
+
+
+(defmethod relative-path-for ((page page))
+  "Relative path for PAGE."
+  *page-path*)
+
+
+(defmethod link-for ((page page) &key url)
+  (cxml:with-element "span"
+    (cxml:attribute "class" "page-link")
+    (cxml:with-element "a"
+      (cxml:attribute "href" (or url (path-for page)))
+      (cxml:text (content-title page)))))
+
+
+
+;;;### Blog post
+;;; A blog post is content with a template of "post" which is the default template.
+(defclass blog-post (templated-content)
+  ((template :initform *blog-post-template* :reader content-template :allocation :class :transient t))
+  (:metaclass elephant:persistent-metaclass)
+  (:documentation "Metadata for blog-posts"))
+
+
 
 (defmethod print-object ((object blog-post) stream)
   "Print a blog post instance showing date and filename"
@@ -335,49 +445,15 @@
 
 (defmethod relative-path-for ((blog-post blog-post))
   "Relative path for a blog post"
-  (list "post" (format nil "~A" (blog-post-year blog-post))))
-
-(defun relative-directory-for (item)
-  (append (list :relative) (funcall *relative-path-fn* item)))
-
-(defun relative-namestring-for (item)
-  (format nil "~{~A/~}" (funcall *relative-path-fn* item)))
-
-(defmethod published-file-path-for ((blog-post blog-post))
-  "Find the publish file path for the specified BLOG-POST."
-  (ensure-directories-exist
-   (merge-pathnames
-    (make-pathname :directory (relative-directory-for blog-post)
-		   :name (blog-post-filename blog-post)
-		   :type "post")
-    *published-path*)))
-
-(defmethod site-file-path-for ((blog-post blog-post))
-  "Find the site file path for the specified BLOG-POST."
-  (ensure-directories-exist
-   (merge-pathnames
-    (make-pathname :directory (relative-directory-for blog-post)
-		   :name (blog-post-filename blog-post)
-		   :type "xhtml") *site-path*)))
-
-
-(defmethod path-for ((blog-post blog-post))
-  (format nil "~A~A~A.xhtml" *blog-root-path*
-	  (relative-namestring-for blog-post)
-	  (blog-post-filename blog-post)))
+  (append *blog-post-path* (list (format nil "~A" (content-year blog-post)))))
 
 (defmethod link-for ((blog-post blog-post) &key url)
   (cxml:with-element "span"
     (cxml:attribute "class" "post-link")
     (cxml:with-element "a"
       (cxml:attribute "href" (or url (path-for blog-post)))
-      (cxml:text (blog-post-title blog-post)))))
+      (cxml:text (content-title blog-post)))))
 
-(defun blog-post-year (blog-post)
-  "Returns the year of the blog post."
-  (destructuring-bind (day month year) (decode-date (blog-post-when blog-post))
-    (declare (ignore day month))
-    (values year)))
 
 ;;;## Dates
 
@@ -417,9 +493,15 @@
 	 do
 	   (multiple-value-setq (has-pair key value) (elephant:cursor-prev cursor))))))
 
-(defun %dirty-posts ()
-  "Create a list of all dirty posts."
-  (elephant:get-instances-by-value 'blog-post 'dirty t))
+(defun %map-dirty-content (fn)
+  "Map all dirty conent."
+  (labels ((wrapped-fn (key value)
+	     (declare (ignore key))
+	     (funcall fn value))
+	   (fn-for-class (class)
+	     (elephant:map-inverted-index #'wrapped-fn class 'dirty :value t)))
+    (mapc #'fn-for-class (list 'blog-post 'page 'index-page 'atom-feed))))
+
 
 (defun %adjacent-posts (blog-post)
   "Return post before and after the given post."
@@ -427,7 +509,7 @@
   (elephant:with-btree-cursor
       (cursor (elephant:find-inverted-index 'blog-post 'when))
     (let (has-pair key value prior next
-		   (when (blog-post-when blog-post))
+		   (when (content-when blog-post))
 		   (oid (elephant::oid blog-post)))
       (multiple-value-setq (has-pair key value)
 	(elephant:cursor-set cursor when))
@@ -459,16 +541,15 @@
   "Publish the draft post at the specified filesystem PATH. Returns a list with
 the path to the published file and the site path."
   (with-open-store ()
-    (multiple-value-bind (output-path blog-post)
+    (multiple-value-bind (output-path templated-content)
 	(%publish-draft (pathname path))
       (if generate-site
 	  (generate-site)
-	  (multiple-value-bind (prior next) (%adjacent-posts blog-post)
-	    (generate-page blog-post :prior prior :next next)))
+	  (generate templated-content))
       (list (namestring output-path)
-	    (namestring (site-file-path-for blog-post))
-	    (url-for blog-post)
-	    (path-for blog-post)))))
+	    (namestring (site-file-path-for templated-content))
+	    (url-for templated-content)
+	    (path-for templated-content)))))
 
 ;;; Republishing uses the "updated" element in the "head" to set the updated time
 ;;; on the post.  If no "updated" is present, then one is added eith the current
@@ -477,15 +558,31 @@ the path to the published file and the site path."
   "Publish an updated post at the specified filesystem PATH. Returns a list with
 the path to the published file and the site path."
   (with-open-store ()
-    (multiple-value-bind (output-path blog-post)
+    (multiple-value-bind (output-path templated-content)
 	(%publish-updated-post (pathname path))
       (if generate-site
 	  (generate-site)
-	  (generate-page blog-post))
+	  (generate templated-content))
       (list (namestring output-path)
-	    (namestring (site-file-path-for blog-post))
-	    (url-for blog-post)
-	    (path-for blog-post)))))
+	    (namestring (site-file-path-for templated-content))
+	    (url-for templated-content)
+	    (path-for templated-content)))))
+
+(defun make-metadata (title when updated tags filename description
+		      synopsis template)
+  "Create metadata of the appropriate type"
+  (unless template
+    (setf template *default-template*))
+  (let ((class (if (string= template *blog-post-template*) 'blog-post 'page)))
+    (make-instance class
+		   :title title
+		   :when (if when (encode-date when))
+		   :updated (if updated (encode-date updated))
+		   :tags tags
+		   :filename filename
+		   :description description
+		   :synopsis synopsis
+		   :template template)))
 
 ;;; Publish a draft. This puts the draft into publish, and creates database meta
 ;;; info for it. Returns the published file path and the blog-post metadata.
@@ -494,30 +591,27 @@ the path to the published file and the site path."
 ;;; proceed.
 (defun %publish-draft (path)
   "Publish the draft at the filesystem PATH."
-  (multiple-value-bind (title post-when post-updated tags linkname description synopsis)
+  (multiple-value-bind (title post-when post-updated tags linkname description
+			      synopsis template)
       (%parse-post-info path)
     (let ((existing-post
-	   (elephant:get-instances-by-value 'blog-post 'title title)))
+	   (or
+	    (elephant:get-instances-by-value 'blog-post 'title title)
+	    (elephant:get-instances-by-value 'page 'title title))))
       (if existing-post
 	  (restart-case
-	      (error "This blog post already exists.")
+	      (error "This content already exists.")
 	    (delete-existing-entry ()
 	      (elephant:drop-instances existing-post)))))
 
-    (let ((blog-post
-	   (make-instance 'blog-post
-			  :title title
-			  :when (encode-date post-when)
-			  :updated (if post-updated
-				       (encode-date post-updated))
-			  :tags tags
-			  :filename linkname
-			  :description description
-			  :synopsis synopsis)))
-      (let* ((output-path (published-file-path-for blog-post)))
-	(%publish-draft-updating-post-metadata path output-path blog-post)
-	(%mark-connected-posts-dirty blog-post)
-	(values output-path blog-post)))))
+
+    (let ((content
+	   (make-metadata title post-when post-updated tags linkname
+			  description synopsis template)))
+      (let* ((output-path (published-file-path-for content)))
+	(%publish-draft-updating-post-metadata path output-path content)
+	(%mark-connected-posts-dirty content)
+	(values output-path content)))))
 
 
 
@@ -542,9 +636,9 @@ the path to the published file and the site path."
 	(setf post-updated (decode-local-date (get-universal-time))))
 
       ;; update metadata
-      (setf (blog-post-updated existing-post) (encode-date post-updated))
-      (setf (blog-post-synopsis existing-post) synopsis)
-      (setf (blog-post-title existing-post) title)
+      (setf (content-updated existing-post) (encode-date post-updated))
+      (setf (content-synopsis existing-post) synopsis)
+      (setf (content-title existing-post) title)
 
       (let* ((output-path (make-pathname :type "tmp" :defaults path)))
 	(%publish-draft-updating-post-metadata path output-path existing-post)
@@ -558,7 +652,7 @@ the path to the published file and the site path."
 (defun %parse-post-info (path)
   "Parse the input file at PATH, extracting the metadata.  Returns title,
 when (day month year), updated (day month year), tags, linkname, description, and synopsis."
-  (let (title tags post-when post-updated linkname description synopsis)
+  (let (title tags post-when post-updated linkname description synopsis template)
     (labels ((decode-date (date-data)
 	       (when date-data
 		 (loop for key in '(:day :month :year)
@@ -583,6 +677,8 @@ when (day month year), updated (day month year), tags, linkname, description, an
 	     (push (klacks:consume-characters post) tags))
 	    ((start-post-element-p key ns element *post-linkname*)
 	     (setf linkname (klacks:consume-characters post)))
+	    ((start-post-element-p key ns element *post-template*)
+	     (setf template (klacks:consume-characters post)))
 	    ((end-post-element-p key ns element *post-head*)
 	     (return nil)))))
 	(klacks:find-element post *post-body*)
@@ -596,13 +692,18 @@ when (day month year), updated (day month year), tags, linkname, description, an
 	(klacks:consume tapped)
 	(setf synopsis (sax:end-document output))))
       (values title (decode-date post-when) (decode-date post-updated)
-	      tags linkname description synopsis))))
+	      tags linkname description synopsis template))))
 
 ;;; When a blog post is published or changes, then some of the pages that
 ;;; link to the post will need to be updated.  This function finds all such
 ;;; pages and marks them dirty.  The index and atom-feed will need updating
 ;;; if the post is in the recent-posts list.
-(defun %mark-connected-posts-dirty (blog-post)
+(defgeneric %mark-connected-posts-dirty (content)
+  (:documentation "Mark connected objects as needing update"))
+
+(defmethod %mark-connected-posts-dirty ((page page)))
+
+(defmethod %mark-connected-posts-dirty ((blog-post blog-post))
   "Mark as dirty anything that the post should cause to be regenerated"
   (let ((recent-posts (%recent-posts)))
     (when (find blog-post recent-posts)
@@ -619,7 +720,8 @@ when (day month year), updated (day month year), tags, linkname, description, an
   "Mark everything as dirty."
   (setf (dirty (index-page)) t)
   (setf (dirty (atom-feed)) t)
-  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'blog-post))
+  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'blog-post)
+  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'page))
 
 ;;; Publish a draft by copying it to the published path, adding the
 ;;; "post-when" element.  This ensures that all meta-data is in the
@@ -635,25 +737,31 @@ when (day month year), updated (day month year), tags, linkname, description, an
 	(cxml:attribute "year" (nth 2 post-when))))))
 
 (defun write-post-when (blog-post)
-  (write-post-date (blog-post-when blog-post) *post-when*))
+  (write-post-date (content-when blog-post) *post-when*))
 
 (defun write-post-updated (blog-post)
-  (write-post-date (blog-post-updated blog-post) *post-updated*))
+  (write-post-date (content-updated blog-post) *post-updated*))
 
 (defun write-post-title (blog-post)
-  (let ((title (blog-post-title blog-post)))
+  (let ((title (content-title blog-post)))
     (when title
       (cxml:with-element *post-title*
 	(cxml:text title)))))
 
 (defun write-post-linkname (blog-post)
-  (let ((linkname (blog-post-filename blog-post)))
+  (let ((linkname (content-filename blog-post)))
     (when linkname
       (cxml:with-element *post-linkname*
 	(cxml:text linkname)))))
 
+(defun write-post-template (blog-post)
+  (let ((template (content-template blog-post)))
+    (when template
+      (cxml:with-element *post-template*
+	(cxml:text template)))))
+
 (defun write-post-description (blog-post)
-  (let ((description (blog-post-description blog-post)))
+  (let ((description (content-description blog-post)))
     (when description
       (cxml:with-element *post-meta*
 	(cxml:attribute *post-name* *post-description*)
@@ -664,7 +772,9 @@ when (day month year), updated (day month year), tags, linkname, description, an
     (cons *post-when*  #'write-post-when)
     (cons *post-title*  #'write-post-title)
     (cons *post-updated*  #'write-post-updated)
-    (cons *post-linkname*  #'write-post-linkname)))
+    (cons *post-linkname*  #'write-post-linkname)
+    (cons *post-template*  #'write-post-template)))
+
 
 (defun %publish-draft-updating-post-metadata (path output-path blog-post)
   "Copy the source inserting the post-when info.  If the output file exists,
@@ -679,15 +789,14 @@ then this code will not be executed)."
 		      :indentation *publish-xml-indentation*
 		      :omit-xml-declaration-p t))
 	     (tapped (klacks:make-tapping-source draft output))
-	     (elements-to-process (list *post-when* *post-updated* *post-title* *post-linkname*))
+	     (elements-to-process (list *post-when* *post-updated* *post-title*
+					*post-linkname* *post-template*))
 	     (description-written-p nil))
 	(labels ((write-element (name)
 		   (funcall (cdr (assoc name *element-dispatch-table* :test #'string=))
 			    blog-post))
 		 (suppress-output-of-next-element ()
 		   (setf (cxml::seen-event-p tapped) t))
-		 (ensure-output-of-suppressed-element ()
-		   (setf (cxml::seen-event-p tapped) nil))
 		 (suppress-current-element ()
 		   (loop do
 			(klacks:consume tapped)
@@ -696,8 +805,7 @@ then this code will not be executed)."
 		   (klacks:consume tapped)))
 	  (cxml:with-xml-output output
 	    (loop do
-		 (suppress-output-of-next-element)
-		 (multiple-value-bind (key ns lname) (klacks:peek tapped)
+		 (multiple-value-bind (key ns lname) (%peek-without-tap tapped)
 		   (cond
 		     ((null key)
 		      (restart-case
@@ -714,42 +822,25 @@ then this code will not be executed)."
 			    (progn
 			      (write-post-description blog-post)
 			      (setf description-written-p t)
-			      (suppress-current-element)
-			      )
-			    (progn
-			      (ensure-output-of-suppressed-element)
-			      (klacks:consume tapped)))))
+			      (suppress-current-element))
+			    (%consume-with-tap tapped))))
 		     ((and (end-post-element-p key ns lname *post-head*))
+		      ;; output everything that hasn't already been output
 		      (loop for element in elements-to-process
 			 do (write-element element))
 		      (unless description-written-p
 			  (write-post-description blog-post))
-		      (ensure-output-of-suppressed-element)
-		      (klacks:consume tapped)
+		      (%consume-with-tap tapped)
 		      (return nil))
 		     (t
-		      (ensure-output-of-suppressed-element)
-		      (klacks:consume tapped)))))
+		      (%consume-with-tap tapped)))))
 	    (klacks:find-event tapped :end-document)))))))
 
 ;;;# Site Generation
 (defun %generate-site ()
   "Generate all dirty content for the site.  Assumes an existing database connection."
-
-  (let ((dirty-posts (%dirty-posts))
-	(index-page (index-page))
-	(atom-feed (atom-feed)))
-    (loop
-       for blog-post in dirty-posts
-       do
-	 (multiple-value-bind (prior next) (%adjacent-posts blog-post)
-	   (generate-page blog-post :prior prior :next next)))
-    (when (or (dirty index-page) (dirty atom-feed))
-      (let ((recent-posts (%recent-posts)))
-	(when (dirty index-page)
-	  (generate-page index-page :collection recent-posts))
-	  (when (dirty atom-feed)
-	    (generate-page atom-feed :collection recent-posts))))))
+  (let (*recent-posts*)
+    (%map-dirty-content #'generate)))
 
 (defun generate-site (&key all)
   "Generate all dirty content for the site. Creates a database connection.  When
@@ -781,15 +872,15 @@ the templates)."
 
 (defun output-post-title (blog-post output)
   (declare (ignore output))
-  (cxml:text (blog-post-title blog-post)))
+  (cxml:text (content-title blog-post)))
 
 (defun output-post-when (blog-post output)
   (declare (ignore output))
-  (cxml:text (format nil "~{~A~^-~}" (decode-date (blog-post-when blog-post)))))
+  (cxml:text (format nil "~{~A~^-~}" (decode-date (content-when blog-post)))))
 
 (defun output-post-updated (blog-post output)
   (declare (ignore output))
-   (let ((updated (blog-post-updated blog-post)))
+   (let ((updated (content-updated blog-post)))
      (when updated
        (cxml:with-element "span"
 	 (cxml:attribute "id" "post-updated-date")
@@ -798,7 +889,7 @@ the templates)."
 (defun output-post-synopsis (blog-post output)
   "Output the synopsis"
   (klacks:with-open-source
-      (source (cxml:make-source (blog-post-synopsis blog-post)))
+      (source (cxml:make-source (content-synopsis blog-post)))
     (let ((tapped (klacks:make-tapping-source source output)))
       (klacks:find-event tapped :end-document))))
 
@@ -807,7 +898,7 @@ the templates)."
   (cxml:with-element "entry"
     (cxml:attribute "xml:base" (base-url))
     (cxml:with-element "title"
-      (cxml:text (blog-post-title blog-post)))
+      (cxml:text (content-title blog-post)))
     (cxml:with-element "link"
       (cxml:attribute "href" (funcall *id-generator-fn* blog-post)))
     (cxml:with-element "id" ;; TODO - fixme
@@ -815,11 +906,11 @@ the templates)."
     (cxml:with-element "published"
       (cxml:text
        (local-time:format-rfc3339-timestring
-	nil (local-time:universal-to-timestamp (blog-post-when blog-post)))))
+	nil (local-time:universal-to-timestamp (content-when blog-post)))))
     (cxml:with-element "updated" ;; TODO - fixme
       (cxml:text
        (local-time:format-rfc3339-timestring
-	nil (local-time:universal-to-timestamp (blog-post-when blog-post)))))
+	nil (local-time:universal-to-timestamp (content-when blog-post)))))
     (cxml:with-element "summary"
       (cxml:attribute "type" "xhtml")
       (cxml:with-element "div"
@@ -842,40 +933,62 @@ the templates)."
     (cons *post-updated-id*  #'output-post-updated)))
 
 ;;;## Page generators
-;;; Generates a blog page.
-(defmethod generate-page ((blog-post blog-post) &key next prior &allow-other-keys)
-  "Generate the page for a blog-post.  Takes the template and merges the post into it."
-  (format t "Generating post '~A'~%" (blog-post-title blog-post))
+
+;;; Top level generators that acquire any require resources
+(defmethod generate ((page page))
+  (generate-page page))
+
+(defmethod generate ((blog-post blog-post))
+  (multiple-value-bind (prior next) (%adjacent-posts blog-post)
+    (generate-page blog-post :prior prior :next next)))
+
+(defparameter *recent-posts* nil)
+(defmethod generate ((index-page index-page))
+  (unless *recent-posts*
+    (setf *recent-posts* (%recent-posts)))
+  (generate-page index-page :collection *recent-posts*))
+
+(defmethod generate ((atom-feed atom-feed))
+  (unless *recent-posts*
+    (setf *recent-posts* (%recent-posts)))
+  (generate-page atom-feed :collection *recent-posts*))
+
+
+
+;;; Generates a page.
+(defmethod generate-page ((templated-content templated-content) &key next prior &allow-other-keys)
+  "Generate the page for a templated-content.  Takes the template and merges the post into it."
+  (format t "Generating post '~A'~%" (content-title templated-content))
   (flet ((output-post-head-title (template)
 	   "Assusmes current element is the template title"
 	   (klacks:peek-next template) ; consume title tag and title text
-	   (cxml:text (blog-post-title blog-post))
+	   (cxml:text (content-title templated-content))
 	   (klacks:peek-next template)) ; close the title tag
 	 (output-post-link (post rel)
 	   "Assusmes current element is in the document head"
 	   (cxml:with-element "link"
 	     (cxml:attribute "rel" rel)
 	     (cxml:attribute "href" (path-for post))
-	     (cxml:attribute "title" (blog-post-title post))))
+	     (cxml:attribute "title" (content-title post))))
 	 (output-post-description ()
 	   "Assusmes current element is in the document head"
-	   (when (blog-post-description blog-post)
+	   (when (content-description templated-content)
 	     (cxml:with-element "meta"
 	       (cxml:attribute "name" "description")
 	       (cxml:attribute "content"
 			       (format nil "~A"
-				       (blog-post-description blog-post))))))
+				       (content-description templated-content))))))
 	 (output-post-tags ()
 	   "Assusmes current element is in the document head"
-	   (when (blog-post-tags blog-post)
+	   (when (content-tags templated-content)
 	     (cxml:with-element "meta"
 	       (cxml:attribute "name" "keywords")
 	       (cxml:attribute "content"
 			       (format nil "~{~A~^,~}"
-				       (blog-post-tags blog-post)))))))
-    (let ((output-path (site-file-path-for blog-post)))
+				       (content-tags templated-content)))))))
+    (let ((output-path (site-file-path-for templated-content)))
       (klacks:with-open-source
-	  (template (cxml:make-source (%template-path "post")))
+	  (template (cxml:make-source (%template-path (content-template templated-content))))
 	;; An open file error here suggests that directory components do not
 	;; exist
 	(with-open-file (stream output-path :direction :output
@@ -895,13 +1008,13 @@ the templates)."
 	      (output-post-tags)
 	      ;; TODO - add meta links for navigation
 	      (loop
-		 for id = (%find-div-or-span-with-an-id tapped)
+		 for id = (%find-element-to-process tapped)
 		 while id
 		 for cmd = (assoc id *id-dispatch-table* :test #'string=)
 		 do
 		   (when cmd
-		     (funcall (cdr cmd) blog-post output)))))))))
-  (setf (dirty blog-post) nil))
+		     (funcall (cdr cmd) templated-content output)))))))))
+  (setf (dirty templated-content) nil))
 
 
 ;;; Generates the index page by finding a list of recent posts, and listing
@@ -955,7 +1068,8 @@ the templates)."
 
 ;;; Defaults for configuration
 (eval-when (:load-toplevel :execute)
-  (setf *relative-path-fn* #'relative-path-for)
+  (setf *blog-post-relative-path-fn* #'relative-path-for)
+  (setf *page-relative-path-fn* #'relative-path-for)
   (setf *id-generator-fn* #'url-for))
 
 

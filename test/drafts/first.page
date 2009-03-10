@@ -1,0 +1,12 @@
+<?xml version="1.1" encoding="UTF-8" ?>
+<html xmlns="http://hugoduncan.org/xmlns/post">
+<head>
+  <title>My First Template Page</title>
+  <tag>lisp</tag>
+  <template>page</template>
+  <linkname>first_page</linkname>
+</head>
+<body>
+<p>My first non blog page.</p>
+</body>
+</html>

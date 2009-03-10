@@ -1,4 +1,4 @@
-# Model for our module - how our dtd patches into xhtml
+# Model for our module - how our dtd patches into xhtml.  This isn't really explicit - but should be ok
 
 HeadOpts.mix =
   (script
@@ -9,7 +9,8 @@ HeadOpts.mix =
    | tag
    | when
    | updated
-   | linkname)*
+   | linkname
+   | template)*
 # .......................................................................
 
 # XHTML 1.1 Document Model Module  ......................................
