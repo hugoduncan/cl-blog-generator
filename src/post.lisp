@@ -40,6 +40,10 @@
 (defparameter *post-title* "title")
 (defparameter *post-head* "head")
 (defparameter *post-body* "body")
+(defparameter *post-meta* "meta")
+(defparameter *post-description* "description")
+(defparameter *post-name* "name")
+(defparameter *post-content* "content")
 (defparameter *element-id* "id")
 
 (defparameter *post-content-id* "post"
@@ -96,6 +100,16 @@
     (let ((sane (remove-if #'remove-character-p (string-downcase (substitute #\_ #\Space title)))))
       (values sane))))
 
+(defun %sanitise-synopsis (synopsis)
+  "Create a description from the synopsis."
+  (klacks:with-open-source (source (cxml:make-source synopsis))
+    (with-output-to-string (output)
+      (loop
+	 for (key ns lname) = (multiple-value-list (klacks:peek-next source))
+	 while key
+	 do (when (eql key :characters)
+	      (format output (klacks:current-characters source)))))))
+
 ;;;## File System Helpers
 ;;; These functions generate local file paths based on the configuration.
 (defun %template-path (key)
@@ -121,6 +135,18 @@
   (and (eql key :end-element)
        (string= element target)
        (string= ns *post-xmlns*)))
+
+;;; Parse atrributes into an a-list
+(defun %capture-attributes (source)
+  "Capture the attributes od the element as an a-list."
+  (let (attribs)
+    (flet ((attribute-mapper (ns lname qname attrib-value explicit-p)
+	     (declare (ignore ns qname explicit-p))
+	     (push (cons (intern (string-upcase lname) 'KEYWORD)
+			 (or (parse-integer attrib-value :junk-allowed t)
+			     attrib-value)) attribs)))
+      (klacks:map-attributes #'attribute-mapper source)
+      (values attribs))))
 
 ;;; These functions find specific types of element events
 (defun %find-div-with-id (template id)
@@ -279,16 +305,26 @@
    (updated :initarg :updated :initform nil :accessor blog-post-updated
 	    :type unsigned-byte :index t
 	    :documentation "Last update time")
+   (description :initarg :description :initform nil :accessor blog-post-description)
    (synopsis :initarg :synopsis :initform nil :accessor blog-post-synopsis))
   (:metaclass elephant:persistent-metaclass)
   (:documentation "Metadata for blog-posts"))
 
 (defmethod shared-initialize :after
     ((blog-post blog-post) slot-names &key &allow-other-keys)
-  (setf (slot-value blog-post 'filename)
-	(if (slot-value blog-post 'filename)
-	    (%sanitise-title (slot-value blog-post 'filename))
-	    (%sanitise-title (slot-value blog-post 'title)))))
+  (with-slots (filename title when description synopsis) blog-post
+    ;; create a sanitised filename
+    (setf filename
+	  (if filename
+	      (%sanitise-title filename)
+	      (%sanitise-title title)))
+    ;; default when to current day
+    (unless when
+      (setf when (decode-local-date (get-universal-time))))
+    ;; create a description
+    (unless (and (slot-boundp blog-post 'description) description)
+      (when synopsis
+	(setf description (%sanitise-synopsis synopsis))))))
 
 (defmethod print-object ((object blog-post) stream)
   "Print a blog post instance showing date and filename"
@@ -458,7 +494,7 @@ the path to the published file and the site path."
 ;;; proceed.
 (defun %publish-draft (path)
   "Publish the draft at the filesystem PATH."
-  (multiple-value-bind (title post-when post-updated tags linkname synopsis)
+  (multiple-value-bind (title post-when post-updated tags linkname description synopsis)
       (%parse-post-info path)
     (let ((existing-post
 	   (elephant:get-instances-by-value 'blog-post 'title title)))
@@ -468,9 +504,6 @@ the path to the published file and the site path."
 	    (delete-existing-entry ()
 	      (elephant:drop-instances existing-post)))))
 
-    (unless post-when
-      (setf post-when (decode-local-date (get-universal-time))))
-
     (let ((blog-post
 	   (make-instance 'blog-post
 			  :title title
@@ -479,6 +512,7 @@ the path to the published file and the site path."
 				       (encode-date post-updated))
 			  :tags tags
 			  :filename linkname
+			  :description description
 			  :synopsis synopsis)))
       (let* ((output-path (published-file-path-for blog-post)))
 	(%publish-draft-updating-post-metadata path output-path blog-post)
@@ -491,9 +525,9 @@ the path to the published file and the site path."
 ;;; path and the blog-post metadata.
 (defun %publish-updated-post (path)
   "Publish the updated post at the filesystem PATH."
-  (multiple-value-bind (title post-when post-updated tags linkname synopsis)
+  (multiple-value-bind (title post-when post-updated tags linkname description synopsis)
       (%parse-post-info path)
-    (declare (ignore post-when tags))
+    (declare (ignore post-when tags description))
     (let ((existing-post
 	   (elephant:get-instances-by-value 'blog-post 'filename linkname)))
       (when existing-post
@@ -518,41 +552,39 @@ the path to the published file and the site path."
 	(%mark-connected-posts-dirty existing-post)
 	(values output-path existing-post)))))
 
+
 ;;; Parse the "title", "when", "updated", "linkname" and "tag" elements.  Also store the first
 ;;; paragraph of the post to act as a synopsis.
 (defun %parse-post-info (path)
   "Parse the input file at PATH, extracting the metadata.  Returns title,
-when (day month year), updated (day month year), tags, linkname, and synopsis."
-  (let (title tags post-when post-updated linkname synopsis attribs)
-    (flet ((decode-date (date-data)
-	     (when date-data
-	       (loop for key in '(:day :month :year)
-		  collect (cdr (assoc key date-data)))))
-	   (attribute-mapper (ns lname qname attrib-value explicit-p)
-		     (declare (ignore ns qname explicit-p))
-		     (push (cons (intern (string-upcase lname) 'KEYWORD)
-				 (read-from-string attrib-value)) attribs)))
+when (day month year), updated (day month year), tags, linkname, description, and synopsis."
+  (let (title tags post-when post-updated linkname description synopsis)
+    (labels ((decode-date (date-data)
+	       (when date-data
+		 (loop for key in '(:day :month :year)
+		    collect (cdr (assoc key date-data)))))
+	     )
       (klacks:with-open-source (post (cxml:make-source path))
 	(loop
-	   do
-	   (multiple-value-bind (key ns element) (klacks:consume post)
-	     (cond
-	       ((start-post-element-p key ns element *post-when*)
-		(setf attribs nil)
-		(klacks:map-attributes #'attribute-mapper post)
-		(setf post-when attribs))
-	       ((start-post-element-p key ns element *post-updated*)
-		(setf attribs nil)
-		(klacks:map-attributes #'attribute-mapper post)
-		(setf post-updated attribs))
-	       ((start-post-element-p key ns element *post-title*)
-		(setf title (klacks:consume-characters post)))
-	       ((start-post-element-p key ns element *post-tag*)
-		(push (klacks:consume-characters post) tags))
-	       ((start-post-element-p key ns element *post-linkname*)
-		(setf linkname (klacks:consume-characters post)))
-	       ((end-post-element-p key ns element *post-head*)
-		(return nil)))))
+	do
+	(multiple-value-bind (key ns element) (klacks:consume post)
+	  (cond
+	    ((start-post-element-p key ns element *post-when*)
+	     (setf post-when (%capture-attributes post)))
+	    ((start-post-element-p key ns element *post-updated*)
+	     (setf post-updated (%capture-attributes post)))
+	    ((start-post-element-p key ns element *post-meta*)
+	     (let ((attribs (%capture-attributes post)))
+	       (when (string= *post-description* (cdr (assoc :name attribs)))
+		 (setf description (cdr (assoc :content attribs))))))
+	    ((start-post-element-p key ns element *post-title*)
+	     (setf title (klacks:consume-characters post)))
+	    ((start-post-element-p key ns element *post-tag*)
+	     (push (klacks:consume-characters post) tags))
+	    ((start-post-element-p key ns element *post-linkname*)
+	     (setf linkname (klacks:consume-characters post)))
+	    ((end-post-element-p key ns element *post-head*)
+	     (return nil)))))
 	(klacks:find-element post *post-body*)
 	(klacks:find-element post "p")
 	(let* ((output (cxml:make-octet-vector-sink
@@ -560,11 +592,11 @@ when (day month year), updated (day month year), tags, linkname, and synopsis."
 			:indentation nil
 			:omit-xml-declaration-p t))
 	       (tapped (klacks:make-tapping-source post output)))
-	  (%find-end-element tapped "p")
-	  (klacks:consume tapped)
-	  (setf synopsis (sax:end-document output))))
+	(%find-end-element tapped "p")
+	(klacks:consume tapped)
+	(setf synopsis (sax:end-document output))))
       (values title (decode-date post-when) (decode-date post-updated)
-	      tags linkname synopsis))))
+	      tags linkname description synopsis))))
 
 ;;; When a blog post is published or changes, then some of the pages that
 ;;; link to the post will need to be updated.  This function finds all such
@@ -620,6 +652,13 @@ when (day month year), updated (day month year), tags, linkname, and synopsis."
       (cxml:with-element *post-linkname*
 	(cxml:text linkname)))))
 
+(defun write-post-description (blog-post)
+  (let ((description (blog-post-description blog-post)))
+    (when description
+      (cxml:with-element *post-meta*
+	(cxml:attribute *post-name* *post-description*)
+	(cxml:attribute *post-content* description)))))
+
 (defparameter *element-dispatch-table*
   (list
     (cons *post-when*  #'write-post-when)
@@ -640,7 +679,8 @@ then this code will not be executed)."
 		      :indentation *publish-xml-indentation*
 		      :omit-xml-declaration-p t))
 	     (tapped (klacks:make-tapping-source draft output))
-	     (elements-to-process (list *post-when* *post-updated* *post-title* *post-linkname*)))
+	     (elements-to-process (list *post-when* *post-updated* *post-title* *post-linkname*))
+	     (description-written-p nil))
 	(labels ((write-element (name)
 		   (funcall (cdr (assoc name *element-dispatch-table* :test #'string=))
 			    blog-post))
@@ -668,9 +708,22 @@ then this code will not be executed)."
 		      (setf elements-to-process (delete lname elements-to-process :test #'string=))
 		      (write-element lname)
 		      (suppress-current-element))
+		     ((start-post-element-p key ns lname *post-meta*)
+		      (let ((attribs (%capture-attributes tapped)))
+			(if (string= *post-description* (cdr (assoc :name attribs)))
+			    (progn
+			      (write-post-description blog-post)
+			      (setf description-written-p t)
+			      (suppress-current-element)
+			      )
+			    (progn
+			      (ensure-output-of-suppressed-element)
+			      (klacks:consume tapped)))))
 		     ((and (end-post-element-p key ns lname *post-head*))
 		      (loop for element in elements-to-process
 			 do (write-element element))
+		      (unless description-written-p
+			  (write-post-description blog-post))
 		      (ensure-output-of-suppressed-element)
 		      (klacks:consume tapped)
 		      (return nil))
@@ -803,7 +856,23 @@ the templates)."
 	   (cxml:with-element "link"
 	     (cxml:attribute "rel" rel)
 	     (cxml:attribute "href" (path-for post))
-	     (cxml:attribute "title" (blog-post-title post)))))
+	     (cxml:attribute "title" (blog-post-title post))))
+	 (output-post-description ()
+	   "Assusmes current element is in the document head"
+	   (when (blog-post-description blog-post)
+	     (cxml:with-element "meta"
+	       (cxml:attribute "name" "description")
+	       (cxml:attribute "content"
+			       (format nil "~A"
+				       (blog-post-description blog-post))))))
+	 (output-post-tags ()
+	   "Assusmes current element is in the document head"
+	   (when (blog-post-tags blog-post)
+	     (cxml:with-element "meta"
+	       (cxml:attribute "name" "keywords")
+	       (cxml:attribute "content"
+			       (format nil "~{~A~^,~}"
+				       (blog-post-tags blog-post)))))))
     (let ((output-path (site-file-path-for blog-post)))
       (klacks:with-open-source
 	  (template (cxml:make-source (%template-path "post")))
@@ -822,6 +891,8 @@ the templates)."
 		(output-post-link prior "prev"))
 	      (when next
 		(output-post-link next "next"))
+	      (output-post-description)
+	      (output-post-tags)
 	      ;; TODO - add meta links for navigation
 	      (loop
 		 for id = (%find-div-or-span-with-an-id tapped)

@@ -7,6 +7,7 @@
   <tag>blog</tag>
   <tag>lisp</tag>
   <linkname>a_second_blog_post_with_an_explicit_linkname</linkname>
+  <meta name="description" content="A description"/>
 </head>
 <body>
 <p>My second post.  With an explicit linkname, and an updated tag.</p>

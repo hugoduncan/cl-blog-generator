@@ -67,25 +67,27 @@
 
 (deftest test-%parse-post-info-first ()
   (with-fixture test-environment-fixture
-    (multiple-value-bind (title when updated tags linkname synopsis)
+    (multiple-value-bind (title when updated tags linkname description synopsis)
 	(cl-blog-generator::%parse-post-info (draft-path "first"))
       (is (string= title "My First Blog Post"))
       (is (equalp '(24 02 2009) when))
       (is (equalp '("lisp" "blog") tags))
       (is (not linkname))
       (is (not updated))
+      (is (not description))
       (is (synopsis= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
       )))
 
 (deftest test-%parse-post-info-second ()
   (with-fixture test-environment-fixture
-    (multiple-value-bind (title when updated tags linkname synopsis)
+    (multiple-value-bind (title when updated tags linkname description synopsis)
 	(cl-blog-generator::%parse-post-info (draft-path "second"))
       (is (string= title "My Second Blog Post"))
       (is (equalp '(26 02 2009) when))
       (is (equalp '("lisp" "blog") tags))
       (is (string= linkname "a_second_blog_post_with_an_explicit_linkname"))
       (is (equalp '(27 02 2009) updated))
+      (is (string= description  "A description"))
       (is (synopsis= "<p>My second post.  With an explicit linkname, and an updated tag.</p>" synopsis))
       )))
 
@@ -107,13 +109,14 @@
 	(is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
 		     (funcall cl-blog-generator::*id-generator-fn* blog-post)))
 
-	(multiple-value-bind (title when updated tags linkname synopsis)
+	(multiple-value-bind (title when updated tags linkname description synopsis)
 	    (cl-blog-generator::%parse-post-info output-path)
 	  (is (string= title "My First Blog Post"))
 	  (is (equalp '(24 02 2009) when))
 	  (is (equalp '("lisp" "blog") tags))
 	  (is (string= linkname "my_first_blog_post"))
 	  (is (null updated))
+	  (is (string= description "My first post.  Mainly to have something to use in developing the code."))
 	  (is (synopsis= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
 	  )))))
 
@@ -167,13 +170,14 @@
 	    (is (string= "http://hugoduncan.org/blog/post/2009/my_first_blog_post.xhtml"
 			 (funcall cl-blog-generator::*id-generator-fn* blog-post)))
 
-	    (multiple-value-bind (title when updated tags linkname synopsis)
+	    (multiple-value-bind (title when updated tags linkname description synopsis)
 		(cl-blog-generator::%parse-post-info output-path)
 	      (is (string= title "My First Blog Post"))
 	      (is (equalp '(24 02 2009) when))
 	      (is (equalp '("lisp" "blog") tags))
 	      (is (string= linkname "my_first_blog_post"))
 	      (is (equalp post-updated updated))
+	      (is (string= description "My first post.  Mainly to have something to use in developing the code."))
 	      (is (synopsis=
 		   "<p>My first post.  Mainly to have something to use in developing the code.</p>"
 		   synopsis)))))))))
