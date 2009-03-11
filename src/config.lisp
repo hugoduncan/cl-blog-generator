@@ -10,6 +10,7 @@
       (:blog-root-path . "/cl-blog-generator/content/site/") ;; should end in /
       (:site-path . #p"/Users/duncan/projects/blog/content/site/")
       (:published-path . #p"/Users/duncan/projects/blog/content/published/")
+      (:dtd-path . #p"/Users/duncan/projects/blog/dtd/")
       (:template-path . #p"/Users/duncan/projects/blog/content/template/"))
     "My development environment")
 
@@ -19,15 +20,17 @@
       (:blog-root-path . "/blog/") ;; should end in /
       (:site-path . #p"/Users/duncan/projects/blog/test/site/")
       (:published-path . #p"/Users/duncan/projects/blog/test/published/")
+      (:dtd-path . #p"/Users/duncan/projects/blog/dtd/")
       (:template-path . #p"/Users/duncan/projects/blog/test/template/"))
     "My test environment")
 
   (defparameter *production-environment*
     '((:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog" "duncan" "")))
       (:blog-domain . "hugoduncan.org")
-      (:blog-root-path . "/blog/") ;; should end in /
-      (:site-path . #p"/Users/duncan/Sites/blog/")
+      (:blog-root-path . "/") ;; should end in /
+      (:site-path . #p"/Users/duncan/Sites/")
       (:published-path . #p"/Users/duncan/blog/published/")
+      (:dtd-path . #p"/Users/duncan/projects/blog/dtd/")
       (:template-path . #p"/Users/duncan/blog/template/"))
     "My production environment")
 
@@ -35,3 +38,5 @@
   (set-environment :development *development-environment*)
   (set-environment :production *production-environment*)
   (configure :production))
+
+;; (setf cxml:*catalog* (cxml:make-catalog '("/opt/local/etc/xml/catalog")))

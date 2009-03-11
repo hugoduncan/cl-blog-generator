@@ -22,6 +22,9 @@
   "The local directory that will contain the published posts.")
 (defvar *template-path* nil
   "The local directory that contains the xhtml templates.")
+(defvar *dtd-path* nil
+  "The local directory that contains the xhtml dtd.")
+
 
 ;;; Optional configuration for customising the behaviour of the system
 (defvar *id-generator-fn* nil
@@ -123,7 +126,8 @@
 
 (defun %sanitise-synopsis (synopsis)
   "Create a description from the synopsis."
-  (klacks:with-open-source (source (cxml:make-source synopsis))
+  (klacks:with-open-source (source (cxml:make-source synopsis
+						     :entity-resolver #'null-resolver))
     (with-output-to-string (output)
       (loop
 	 for (key ns lname) = (multiple-value-list (klacks:peek-next source))
@@ -141,6 +145,20 @@
 
 
 ;;;## XHTML Helpers
+;;; Provide a macro for xml fragment output
+(defmacro with-xml-fragment-output (sink &body body)
+  "Modified with-xml-output"
+  `(invoke-with-xml-fragment-output (lambda () ,@body) ,sink))
+
+(defun invoke-with-xml-fragment-output (fn sink)
+  "Modified invoke-with-xml-output"
+  (let ((cxml::*sink* sink)
+        (cxml::*current-element* nil)
+	(cxml::*unparse-namespace-bindings* cxml::*initial-namespace-bindings*)
+	(cxml::*current-namespace-bindings* nil))
+    (funcall fn)))
+
+
 ;;; These functions provide logical tests for CXML Klacks events
 (defun start-post-element-p (key ns element target)
   (and (eql key :start-element)
@@ -157,6 +175,13 @@
        (string= element target)
        (string= ns *post-xmlns*)))
 
+;;; DTD faking resolver - Had problems with using the real DTD - it output
+;;; xmlns attribues on each element.  http://paste.lisp.org/display/76827
+(defun null-resolver (pubid sysid)
+  "An entity resolver which does nothing."
+  (declare (ignore pubid sysid))
+  (flexi-streams:make-in-memory-input-stream nil))
+
 ;;; Functions to control output of tapped
 (defun %peek-without-tap (tapped-source)
   "Peek without triggering the output of a TAPPED-SOURCE"
@@ -167,6 +192,12 @@
   "Consume current event, ensuring it will be seen by the tapped output"
   (setf (cxml::seen-event-p tapped-source) nil)
   (klacks:consume tapped-source))
+
+(defun %skip-preamble (tapped-source)
+  (loop for key = (%peek-without-tap tapped-source)
+       while (not (eql :start-element key))
+     do (klacks:consume tapped-source))
+  (setf (cxml::seen-event-p tapped-source) nil))
 
 ;;; Parse atrributes into an a-list
 (defun %capture-attributes (source)
@@ -203,9 +234,7 @@
   "Find the end element in the SOURCE with specified lname"
   (loop
      for found = nil
-     for end-element = (multiple-value-list (klacks:find-event source :end-element))
-     while end-element
-     for (key ns name) = end-element
+     for (key ns name) = (multiple-value-list (klacks:find-event source :end-element))
      while key
      do
        (when (string= lname name)
@@ -497,7 +526,8 @@
   "Map all dirty conent."
   (labels ((wrapped-fn (key value)
 	     (declare (ignore key))
-	     (funcall fn value))
+	     (when value
+	       (funcall fn value)))
 	   (fn-for-class (class)
 	     (elephant:map-inverted-index #'wrapped-fn class 'dirty :value t)))
     (mapc #'fn-for-class (list 'blog-post 'page 'index-page 'atom-feed))))
@@ -658,7 +688,7 @@ when (day month year), updated (day month year), tags, linkname, description, an
 		 (loop for key in '(:day :month :year)
 		    collect (cdr (assoc key date-data)))))
 	     )
-      (klacks:with-open-source (post (cxml:make-source path))
+      (klacks:with-open-source (post (cxml:make-source path :entity-resolver #'null-resolver))
 	(loop
 	do
 	(multiple-value-bind (key ns element) (klacks:consume post)
@@ -780,14 +810,14 @@ when (day month year), updated (day month year), tags, linkname, description, an
   "Copy the source inserting the post-when info.  If the output file exists,
 then it is overwritten (if the user has not chosen to delete an existing post,
 then this code will not be executed)."
-  (klacks:with-open-source (draft (cxml:make-source path))
+  (klacks:with-open-source (draft (cxml:make-source path :entity-resolver #'null-resolver))
     (with-open-file (stream output-path :direction :output
 			    :element-type '(unsigned-byte 8)
 			    :if-exists :supersede)
       (let* ((output (cxml:make-octet-stream-sink
 		      stream :canonical nil
 		      :indentation *publish-xml-indentation*
-		      :omit-xml-declaration-p t))
+		      :omit-xml-declaration-p nil))
 	     (tapped (klacks:make-tapping-source draft output))
 	     (elements-to-process (list *post-when* *post-updated* *post-title*
 					*post-linkname* *post-template*))
@@ -803,7 +833,7 @@ then this code will not be executed)."
 			(suppress-output-of-next-element)
 		      until (eql (klacks:peek tapped) :end-element))
 		   (klacks:consume tapped)))
-	  (cxml:with-xml-output output
+	  (with-xml-fragment-output output
 	    (loop do
 		 (multiple-value-bind (key ns lname) (%peek-without-tap tapped)
 		   (cond
@@ -858,7 +888,7 @@ the templates)."
 
 (defun output-post-content (blog-post output)
   (klacks:with-open-source
-      (source (cxml:make-source (published-file-path-for blog-post)))
+      (source (cxml:make-source (published-file-path-for blog-post) :entity-resolver #'null-resolver))
     (loop do
 	 (multiple-value-bind (key ns lname) (klacks:consume source)
 	   (when (start-post-element-p key ns lname *post-body*)
@@ -889,8 +919,9 @@ the templates)."
 (defun output-post-synopsis (blog-post output)
   "Output the synopsis"
   (klacks:with-open-source
-      (source (cxml:make-source (content-synopsis blog-post)))
+      (source (cxml:make-source (content-synopsis blog-post) :entity-resolver #'null-resolver))
     (let ((tapped (klacks:make-tapping-source source output)))
+      (%skip-preamble tapped)
       (klacks:find-event tapped :end-document))))
 
 (defun output-post-atom-entry (blog-post output)
@@ -934,7 +965,7 @@ the templates)."
 
 ;;;## Page generators
 
-;;; Top level generators that acquire any require resources
+;;; Top level generators that acquire any required resources
 (defmethod generate ((page page))
   (generate-page page))
 
@@ -942,7 +973,9 @@ the templates)."
   (multiple-value-bind (prior next) (%adjacent-posts blog-post)
     (generate-page blog-post :prior prior :next next)))
 
-(defparameter *recent-posts* nil)
+(defparameter *recent-posts* nil
+  "Used to cache the recent-posts while generating pages")
+
 (defmethod generate ((index-page index-page))
   (unless *recent-posts*
     (setf *recent-posts* (%recent-posts)))
@@ -988,16 +1021,16 @@ the templates)."
 				       (content-tags templated-content)))))))
     (let ((output-path (site-file-path-for templated-content)))
       (klacks:with-open-source
-	  (template (cxml:make-source (%template-path (content-template templated-content))))
-	;; An open file error here suggests that directory components do not
-	;; exist
+	  (template (cxml:make-source (%template-path (content-template templated-content))
+				      :entity-resolver #'null-resolver
+				      ))
 	(with-open-file (stream output-path :direction :output
 				:element-type '(unsigned-byte 8)
 				:if-exists :supersede
 				:if-does-not-exist :create)
-	  (let* ((output (cxml:make-octet-stream-sink stream :canonical 2))
+	  (let* ((output (cxml:make-octet-stream-sink stream :canonical nil :omit-xml-declaration-p nil))
 		 (tapped (klacks:make-tapping-source template output)))
-	    (cxml:with-xml-output output
+	    (with-xml-fragment-output output
 	      (klacks:find-element tapped *post-title*)
 	      (output-post-head-title tapped)
 	      (when prior
@@ -1017,45 +1050,54 @@ the templates)."
   (setf (dirty templated-content) nil))
 
 
+
 ;;; Generates the index page by finding a list of recent posts, and listing
 ;;; links to them with a synopsis of each (the first paragraph, anyway).
 (defmethod generate-page ((index-page index-page) &key collection)
   "Generate the index page for the blog."
   (format t "Generating index page~%")
-  (klacks:with-open-source (template (cxml:make-source (%template-path "index")))
+  (klacks:with-open-source (template (cxml:make-source (%template-path "index")
+						       :entity-resolver #'null-resolver))
     (with-open-file
 	(stream (site-file-path-for index-page) :direction :output
 		:element-type '(unsigned-byte 8) :if-exists :supersede)
-      (let* ((output (cxml:make-octet-stream-sink stream :canonical 2))
+      (let* ((output (cxml:make-octet-stream-sink
+		      stream :canonical nil :omit-xml-declaration-p nil))
 	     (tapped (klacks:make-tapping-source template output)))
-	(cxml:with-xml-output output
+	(with-xml-fragment-output output
+	  ;; 	  (loop for key = (%peek-without-tap tapped)
+	  ;; 	     while (not (eql key :start-element))
+	  ;; 	     do (%consume-with-tap tapped))
+	  ;; 	  (cxml:doctype "html" "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd")
+	  ;; 	  (%consume-with-tap tapped)
 	  (flet ((output-post-link (blog-post)
 		   (link-for blog-post
 			     :url (enough-namestring
 				   (site-file-path-for blog-post)
 				   (site-file-path-for index-page)))
- 		   (output-post-synopsis blog-post output)))
+		   (output-post-synopsis blog-post output)))
 	    (%find-div-with-id tapped "posts")
 	    (cxml:with-element "div"
 	      (cxml:attribute "class" "post-synopsis")
 	      (mapc #'output-post-link collection))
 	    (klacks:find-event tapped :end-document))))))
-  (setf (dirty index-page) nil))
+    (setf (dirty index-page) nil))
 
 ;;; Generates the atom feed by finding a list of recent posts, and listing
 ;;; links to them with the full contents of each.
 (defmethod generate-page ((atom-feed atom-feed) &key collection)
   "Generate the atom feed for the blog."
   (format t "Generating Atom feed~%")
-  (klacks:with-open-source (template (cxml:make-source (%template-path "atom")))
+  (klacks:with-open-source (template (cxml:make-source (%template-path "atom")
+						       :entity-resolver #'null-resolver))
     (with-open-file
 	(stream (site-file-path-for atom-feed) :direction :output
 		:element-type '(unsigned-byte 8) :if-exists :supersede)
       (let* ((output (cxml:make-octet-stream-sink stream :canonical nil
 						  :indentation nil
-						  :omit-xml-declaration-p t))
+						  :omit-xml-declaration-p nil))
 	     (tapped (klacks:make-tapping-source template output)))
-	(cxml:with-xml-output output
+	(with-xml-fragment-output output
 	  (klacks:find-element tapped "updated")
 	  (cxml:text (local-time:format-rfc3339-timestring nil (local-time:now)))
 	  (klacks:consume tapped)
@@ -1071,7 +1113,6 @@ the templates)."
   (setf *blog-post-relative-path-fn* #'relative-path-for)
   (setf *page-relative-path-fn* #'relative-path-for)
   (setf *id-generator-fn* #'url-for))
-
 
 ;;; Hacks
 (defun recent-posts ()
