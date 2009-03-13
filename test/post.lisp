@@ -326,6 +326,7 @@
     (cl-blog-generator::publish-draft (draft-path "first"))
     (cl-blog-generator::publish-draft (draft-path "second"))
     (cl-blog-generator::publish-draft (draft-path "third"))
+    (cl-blog-generator::publish-draft (draft-path "fith"))
     (destructuring-bind (url path) (cl-blog-generator::generate-site)
       (is (stringp url))
       (is (stringp path))

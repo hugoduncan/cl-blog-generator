@@ -68,7 +68,9 @@
 (defparameter *post-name* "name")
 (defparameter *post-content* "content")
 (defparameter *post-template* "template")
+(defparameter *page-link-for* "page-link-for")
 (defparameter *element-id* "id")
+(defparameter *element-class* "class")
 
 (defparameter *post-content-id* "post"
   "ID of element to contain the post content")
@@ -78,6 +80,8 @@
   "ID of element to contain the post when date")
 (defparameter *post-updated-id* "post-updated"
   "ID of element to contain the post updated date")
+(defparameter *post-posts-id* "posts"
+  "ID of element to contain the posts list")
 
 (defparameter *publish-xml-indentation* nil)
 
@@ -126,8 +130,8 @@
 
 (defun %sanitise-synopsis (synopsis)
   "Create a description from the synopsis."
-  (klacks:with-open-source (source (cxml:make-source synopsis
-						     :entity-resolver #'null-resolver))
+  (klacks:with-open-source
+      (source (cxml:make-source synopsis :entity-resolver #'null-resolver))
     (with-output-to-string (output)
       (loop
 	 for (key ns lname) = (multiple-value-list (klacks:peek-next source))
@@ -182,22 +186,45 @@
   (declare (ignore pubid sysid))
   (flexi-streams:make-in-memory-input-stream nil))
 
-;;; Functions to control output of tapped
-(defun %peek-without-tap (tapped-source)
-  "Peek without triggering the output of a TAPPED-SOURCE"
-  (setf (cxml::seen-event-p tapped-source) t)
-  (klacks:peek tapped-source))
+(defun %copy-current-element-content (source sink)
+  "When called with an un-output start-element, copy the content of the element.
+The end-element event will be consumed but not output."
+  (klacks:consume source)
+  (loop with depth = 1
+     for key = (klacks:peek source)
+     do
+       (when (and (eql key :end-element) (zerop (decf depth)))
+	 (return nil))
+       (when (eql key :end-element)
+	 (incf depth))
+       (klacks:serialize-event source sink))
+  (klacks:consume source))
 
-(defun %consume-with-tap (tapped-source)
-  "Consume current event, ensuring it will be seen by the tapped output"
-  (setf (cxml::seen-event-p tapped-source) nil)
-  (klacks:consume tapped-source))
+(defun %copy-current-element (source sink)
+  "When called with an un-output start-element, copy the current element."
+  (loop with depth = 1
+     for key = (klacks:peek source)
+     do (when (and (eql key :end-element) (zerop (decf depth)))
+	  (return nil))
+       (when (eql key :end-element)
+	 (incf depth))
+       (klacks:serialize-event source sink))
+  (klacks:serialize-event source sink))
 
-(defun %skip-preamble (tapped-source)
-  (loop for key = (%peek-without-tap tapped-source)
-       while (not (eql :start-element key))
-     do (klacks:consume tapped-source))
-  (setf (cxml::seen-event-p tapped-source) nil))
+(defun %suppress-current-element (source)
+  "When called with an un-output start-element, suppress the element."
+  (klacks:consume source)
+  (loop with depth = 1
+     for key = (klacks:consume source)
+     do (when (and (eql key :end-element) (zerop (decf depth)))
+	  (return nil))
+       (when (eql key :end-element)
+	 (incf depth))))
+
+(defun %skip-preamble (source)
+  "Skips any XML preamble before a documents first content."
+  (loop for key = (klacks:peek-next source)
+     while (not (eql :start-element key))))
 
 ;;; Parse atrributes into an a-list
 (defun %capture-attributes (source)
@@ -211,24 +238,6 @@
       (klacks:map-attributes #'attribute-mapper source)
       (values attribs))))
 
-;;; These functions find specific types of element events
-(defun %find-div-with-id (template id)
-  "Find the div element in the TEMPLATE with specified ID"
-  (loop
-     for found = nil
-     for div = (klacks:find-element template "div")
-     while div
-     do
-       (klacks:map-attributes
-	#'(lambda (ns lname qname attrib-value explicit-p)
-	    (declare (ignore ns qname explicit-p))
-	    (when (and (string= lname *element-id*)
-		       (string= attrib-value id))
-	      (setf found t)))
-	template)
-       (klacks:consume template)
-       (when found
-	 (return nil))))
 
 (defun %find-end-element (source lname)
   "Find the end element in the SOURCE with specified lname"
@@ -241,25 +250,15 @@
 	 (return nil))
        (klacks:consume source)))
 
-;;; Finds elements that should be replaced in the template.
-(defun %find-element-to-process (template)
-  "Find the next div, span, or a element in the TEMPLATE which has an id or a class."
-  (loop
-     with id = nil
-     until id
-     for element = (klacks:find-event template :start-element)
-     while element
+(defun %copy-to-next-start-element (source sink lname)
+  "Find the next LNAME element in the SOURCE outputting up to the found element
+to SINK."
+  (loop for (key ns ln) = (multiple-value-list (klacks:peek source))
+     while key
      do
-       (klacks:map-attributes
-	#'(lambda (ns lname qname attrib-value explicit-p)
-	    (declare (ignore ns qname explicit-p))
-	    (when (and (string= lname *element-id*))
-	      (setf id attrib-value)))
-	template)
-       (klacks:consume template)
-     finally
-       (return id)))
-
+       (when (and (eql key :start-element) (string= lname ln))
+	 (return (%capture-attributes source)))
+       (klacks:serialize-event source sink)))
 
 
 ;;; A debugging function to dump the current event
@@ -712,14 +711,14 @@ when (day month year), updated (day month year), tags, linkname, description, an
 	    ((end-post-element-p key ns element *post-head*)
 	     (return nil)))))
 	(klacks:find-element post *post-body*)
-	(klacks:find-element post "p")
+	(loop for key = (klacks:peek-next post)
+	   while key
+	   until (eql key :start-element))
 	(let* ((output (cxml:make-octet-vector-sink
 			:canonical nil
 			:indentation nil
-			:omit-xml-declaration-p t))
-	       (tapped (klacks:make-tapping-source post output)))
-	(%find-end-element tapped "p")
-	(klacks:consume tapped)
+			:omit-xml-declaration-p t)))
+	  (%copy-current-element post output)
 	(setf synopsis (sax:end-document output))))
       (values title (decode-date post-when) (decode-date post-updated)
 	      tags linkname description synopsis template))))
@@ -818,24 +817,15 @@ then this code will not be executed)."
 		      stream :canonical nil
 		      :indentation *publish-xml-indentation*
 		      :omit-xml-declaration-p nil))
-	     (tapped (klacks:make-tapping-source draft output))
 	     (elements-to-process (list *post-when* *post-updated* *post-title*
 					*post-linkname* *post-template*))
 	     (description-written-p nil))
 	(labels ((write-element (name)
 		   (funcall (cdr (assoc name *element-dispatch-table* :test #'string=))
-			    blog-post))
-		 (suppress-output-of-next-element ()
-		   (setf (cxml::seen-event-p tapped) t))
-		 (suppress-current-element ()
-		   (loop do
-			(klacks:consume tapped)
-			(suppress-output-of-next-element)
-		      until (eql (klacks:peek tapped) :end-element))
-		   (klacks:consume tapped)))
+			    blog-post)))
 	  (with-xml-fragment-output output
 	    (loop do
-		 (multiple-value-bind (key ns lname) (%peek-without-tap tapped)
+		 (multiple-value-bind (key ns lname) (klacks:peek draft)
 		   (cond
 		     ((null key)
 		      (restart-case
@@ -845,26 +835,26 @@ then this code will not be executed)."
 			   (find lname elements-to-process :test #'string=))
 		      (setf elements-to-process (delete lname elements-to-process :test #'string=))
 		      (write-element lname)
-		      (suppress-current-element))
+		      (%suppress-current-element draft))
 		     ((start-post-element-p key ns lname *post-meta*)
-		      (let ((attribs (%capture-attributes tapped)))
+		      (let ((attribs (%capture-attributes draft)))
 			(if (string= *post-description* (cdr (assoc :name attribs)))
 			    (progn
 			      (write-post-description blog-post)
 			      (setf description-written-p t)
-			      (suppress-current-element))
-			    (%consume-with-tap tapped))))
+			      (%suppress-current-element draft))
+			    (klacks:serialize-event draft output))))
 		     ((and (end-post-element-p key ns lname *post-head*))
 		      ;; output everything that hasn't already been output
 		      (loop for element in elements-to-process
 			 do (write-element element))
 		      (unless description-written-p
 			  (write-post-description blog-post))
-		      (%consume-with-tap tapped)
+		      (klacks:serialize-event draft output)
 		      (return nil))
 		     (t
-		      (%consume-with-tap tapped)))))
-	    (klacks:find-event tapped :end-document)))))))
+		      (klacks:serialize-event draft output)))))
+	    (klacks:serialize-source draft output)))))))
 
 ;;;# Site Generation
 (defun %generate-site ()
@@ -885,14 +875,27 @@ the templates)."
 
 ;;;## Output functions
 ;;; Used to output content
+(defmacro with-existing-element ((template output) &body body)
+  (let ((tp (gensym))
+	(o (gensym))
+	(k (gensym)))
+    `(let ((,tp ,template)
+	   (,o ,output))
+       (loop for ,k = (klacks:peek ,tp)
+	  while (not (eql ,k :end-element))
+	  do (klacks:serialize-event ,tp ,o))
+       ,@body
+       (klacks:serialize-event ,tp ,o))))
 
-(defun output-post-content (blog-post output)
+
+(defun output-post-content-no-template (blog-post output)
   (klacks:with-open-source
       (source (cxml:make-source (published-file-path-for blog-post) :entity-resolver #'null-resolver))
-    (loop do
-	 (multiple-value-bind (key ns lname) (klacks:consume source)
-	   (when (start-post-element-p key ns lname *post-body*)
-	     (return nil))))
+    (klacks:find-element source *post-body*)
+    (loop for key = (klacks:peek-next source)
+       while key
+       until (eql key :start-element))
+    (output-with-rewrite blog-post source output)
     (loop do
 	 (multiple-value-bind (key ns lname) (klacks:peek source)
 	   (when (end-post-element-p key ns lname *post-body*)
@@ -900,60 +903,54 @@ the templates)."
        ;; serialiszing consumes the event
 	 (klacks:serialize-event source output))))
 
-(defun output-post-title (blog-post output)
-  (declare (ignore output))
-  (cxml:text (content-title blog-post)))
+(defun output-post-content (blog-post template output attributes)
+  (declare (ignore attributes))
+  (with-existing-element (template output)
+    (output-post-content-no-template blog-post output)))
 
-(defun output-post-when (blog-post output)
-  (declare (ignore output))
-  (cxml:text (format nil "~{~A~^-~}" (decode-date (content-when blog-post)))))
 
-(defun output-post-updated (blog-post output)
-  (declare (ignore output))
-   (let ((updated (content-updated blog-post)))
-     (when updated
-       (cxml:with-element "span"
-	 (cxml:attribute "id" "post-updated-date")
-	 (cxml:text (format nil "~{~A~^-~}" (decode-date updated)))))))
+(defun output-post-title (blog-post template output attributes)
+  (declare (ignore attributes))
+  (with-existing-element (template output)
+    (cxml:text (content-title blog-post))))
+
+(defun output-post-when (blog-post template output attributes)
+  (declare (ignore attributes))
+  (with-existing-element (template output)
+    (cxml:text (format nil "~{~A~^-~}" (decode-date (content-when blog-post))))))
+
+(defun output-post-updated (blog-post template output attributes)
+  (declare (ignore attributes))
+  (with-existing-element (template output)
+    (let ((updated (content-updated blog-post)))
+      (when updated
+	(cxml:with-element "span"
+	  (cxml:attribute "id" "post-updated-date")
+	  (cxml:text (format nil "~{~A~^-~}" (decode-date updated))))))))
 
 (defun output-post-synopsis (blog-post output)
   "Output the synopsis"
   (klacks:with-open-source
       (source (cxml:make-source (content-synopsis blog-post) :entity-resolver #'null-resolver))
-    (let ((tapped (klacks:make-tapping-source source output)))
-      (%skip-preamble tapped)
-      (klacks:find-event tapped :end-document))))
+    (%skip-preamble source)
+    (output-with-rewrite blog-post source output)))
 
-(defun output-post-atom-entry (blog-post output)
-  "Output an atom entry for the post."
-  (cxml:with-element "entry"
-    (cxml:attribute "xml:base" (base-url))
-    (cxml:with-element "title"
-      (cxml:text (content-title blog-post)))
-    (cxml:with-element "link"
-      (cxml:attribute "href" (funcall *id-generator-fn* blog-post)))
-    (cxml:with-element "id" ;; TODO - fixme
-      (cxml:text (url-for blog-post)))
-    (cxml:with-element "published"
-      (cxml:text
-       (local-time:format-rfc3339-timestring
-	nil (local-time:universal-to-timestamp (content-when blog-post)))))
-    (cxml:with-element "updated" ;; TODO - fixme
-      (cxml:text
-       (local-time:format-rfc3339-timestring
-	nil (local-time:universal-to-timestamp (content-when blog-post)))))
-    (cxml:with-element "summary"
-      (cxml:attribute "type" "xhtml")
+
+
+(defparameter *index-collection* nil)
+
+(defun output-post-synopses-with-links (content template output attributes)
+  (declare (ignore attributes))
+  (flet ((output-post-link (blog-post)
       (cxml:with-element "div"
-	(cxml:attribute "xmlns" *xhtml-xmlns*)
-	(cxml:text "") ; force end of div start tag
-	(output-post-synopsis blog-post output)))
-    (cxml:with-element "content"
-      (cxml:attribute "type" "xhtml")
-      (cxml:with-element "div"
-	(cxml:attribute "xmlns" *xhtml-xmlns*)
-	(cxml:text "") ; force end of div start tag
-	(output-post-content blog-post output)))))
+	(cxml:attribute "class" "post-synopsis")
+	(link-for blog-post
+		  :url (enough-namestring
+			(site-file-path-for blog-post)
+			(site-file-path-for content)))
+	(output-post-synopsis blog-post output))))
+    (with-existing-element (template output)
+      (mapc #'output-post-link *index-collection*))))
 
 ;;; Table mapping element id's to the corresponding output function
 (defparameter *id-dispatch-table*
@@ -961,7 +958,89 @@ the templates)."
     (cons *post-content-id*  #'output-post-content)
     (cons *post-title-id*  #'output-post-title)
     (cons *post-when-id* #'output-post-when)
-    (cons *post-updated-id*  #'output-post-updated)))
+    (cons *post-updated-id*  #'output-post-updated)
+    (cons *post-posts-id*  #'output-post-synopses-with-links)))
+
+
+
+(defun output-link-for (blog-post template output attributes)
+  "Output a link for the specified post or page specified in the href
+attribute."
+  (declare (ignore blog-post))
+  (let* ((href-entry (assoc :href attributes))
+	 (linkname (%sanitise-title (cdr href-entry)))
+	 (linked-content
+	  (some #'(lambda (class)
+		    (elephant:get-instance-by-value class 'filename linkname))
+		'(page blog-post))))
+    (when linked-content
+      (setf (cdr href-entry) (url-for linked-content))))
+  (cxml:with-element "a"
+    (mapc #'(lambda (x)
+	      (let* ((attrib (string-downcase (string (car x))))
+		     (a1 (make-array (length attrib) :element-type 'character :initial-contents attrib)))
+		(cxml:attribute a1 (cdr x))))  ;; not sure why we have to copy this
+	  attributes)
+    (cxml:text "")
+    (%copy-current-element-content template output)))
+
+
+(defparameter *class-dispatch-table*
+  (list
+   (cons *page-link-for* #'output-link-for)))
+
+(defmacro with-each-word ((var string) &body body)
+  (let ((i (gensym))
+	(j (gensym))
+	(s (gensym)))
+    `(loop
+	with ,s = ,string
+	for ,i = 0 then (1+ ,j)
+	for ,j = (position #\Space ,s :start ,i)
+	do (let ((,var (subseq ,s ,i ,j)))
+	     ,@body)
+	while ,j)))
+
+(defun output-with-rewrite (templated-content source output)
+  "Outputs a SOURCE, rewriting content as required to the OUTPUT sink.  Writes
+only the current element."
+  (flet ((dispatch (cmd attributes)
+	   (when cmd
+	     (funcall (cdr cmd) templated-content source output attributes))))
+    (loop for key = (klacks:peek source)
+       while (eql key :characters)
+       do (klacks:serialize-event source output))
+    (loop
+       with depth = 0
+       for (key ns lname) = (multiple-value-list (klacks:peek source))
+       while key
+       do
+	 (cond
+	   ((eql :start-element key)
+	    (let* ((attributes (%capture-attributes source))
+		   (id (assoc :id attributes))
+		   (class (assoc :class attributes))
+		   (id-cmd (assoc (cdr id) *id-dispatch-table* :test #'string=))
+		   (class-cmds))
+	      (unless id-cmd
+		(with-each-word (c (cdr class))
+		  (let ((cmd (assoc c *class-dispatch-table* :test #'string=)))
+		    (when cmd
+		      (push cmd class-cmds)))))
+	      (cond
+		(id-cmd
+		 (dispatch id-cmd attributes))
+		((plusp (length class-cmds))
+		 (dispatch (first class-cmds) attributes))
+		(t
+		 (incf depth)
+		 (klacks:serialize-event source output)))))
+	   ((eql :end-element key)
+	    (when (minusp (decf depth))
+	      (return nil))
+	    (klacks:serialize-event source output))
+	   (t
+	    (klacks:serialize-event source output))))))
 
 ;;;## Page generators
 
@@ -992,11 +1071,13 @@ the templates)."
 (defmethod generate-page ((templated-content templated-content) &key next prior &allow-other-keys)
   "Generate the page for a templated-content.  Takes the template and merges the post into it."
   (format t "Generating post '~A'~%" (content-title templated-content))
-  (flet ((output-post-head-title (template)
+  (flet ((output-post-head-title (template output)
 	   "Assusmes current element is the template title"
-	   (klacks:peek-next template) ; consume title tag and title text
+	   (loop for key = (klacks:peek template)
+		until (eql key :end-element)
+	      do (klacks:serialize-event template output)) ; consume title tag and title text
 	   (cxml:text (content-title templated-content))
-	   (klacks:peek-next template)) ; close the title tag
+	   (klacks:serialize-event template output)) ; close the title tag
 	 (output-post-link (post rel)
 	   "Assusmes current element is in the document head"
 	   (cxml:with-element "link"
@@ -1022,31 +1103,25 @@ the templates)."
     (let ((output-path (site-file-path-for templated-content)))
       (klacks:with-open-source
 	  (template (cxml:make-source (%template-path (content-template templated-content))
-				      :entity-resolver #'null-resolver
-				      ))
+				      :entity-resolver #'null-resolver))
 	(with-open-file (stream output-path :direction :output
 				:element-type '(unsigned-byte 8)
 				:if-exists :supersede
 				:if-does-not-exist :create)
-	  (let* ((output (cxml:make-octet-stream-sink stream :canonical nil :omit-xml-declaration-p nil))
-		 (tapped (klacks:make-tapping-source template output)))
+	  (let ((output (cxml:make-octet-stream-sink stream :canonical nil :omit-xml-declaration-p nil)))
 	    (with-xml-fragment-output output
-	      (klacks:find-element tapped *post-title*)
-	      (output-post-head-title tapped)
+	      (%copy-to-next-start-element template output *post-title*)
+	      (output-post-head-title template output)
 	      (when prior
 		(output-post-link prior "prev"))
 	      (when next
 		(output-post-link next "next"))
 	      (output-post-description)
 	      (output-post-tags)
-	      ;; TODO - add meta links for navigation
-	      (loop
-		 for id = (%find-element-to-process tapped)
-		 while id
-		 for cmd = (assoc id *id-dispatch-table* :test #'string=)
-		 do
-		   (when cmd
-		     (funcall (cdr cmd) templated-content output)))))))))
+	      (%copy-to-next-start-element template output *post-body*)
+	      (klacks:serialize-event template output)
+	      (output-with-rewrite templated-content template output)
+	      (klacks:serialize-source template output)))))))
   (setf (dirty templated-content) nil))
 
 
@@ -1062,26 +1137,48 @@ the templates)."
 	(stream (site-file-path-for index-page) :direction :output
 		:element-type '(unsigned-byte 8) :if-exists :supersede)
       (let* ((output (cxml:make-octet-stream-sink
-		      stream :canonical nil :omit-xml-declaration-p nil))
-	     (tapped (klacks:make-tapping-source template output)))
+		      stream :canonical nil :omit-xml-declaration-p nil)))
 	(with-xml-fragment-output output
-	  ;; 	  (loop for key = (%peek-without-tap tapped)
-	  ;; 	     while (not (eql key :start-element))
-	  ;; 	     do (%consume-with-tap tapped))
-	  ;; 	  (cxml:doctype "html" "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd")
-	  ;; 	  (%consume-with-tap tapped)
-	  (flet ((output-post-link (blog-post)
-		   (link-for blog-post
-			     :url (enough-namestring
-				   (site-file-path-for blog-post)
-				   (site-file-path-for index-page)))
-		   (output-post-synopsis blog-post output)))
-	    (%find-div-with-id tapped "posts")
-	    (cxml:with-element "div"
-	      (cxml:attribute "class" "post-synopsis")
-	      (mapc #'output-post-link collection))
-	    (klacks:find-event tapped :end-document))))))
-    (setf (dirty index-page) nil))
+	  (let ((*index-collection* collection))
+	    (loop for key = (klacks:peek template)
+	       while key
+	       until (eql key :start-element)
+	       do (klacks:serialize-event template output))
+	    (output-with-rewrite index-page template output))))))
+  (setf (dirty index-page) nil))
+
+
+
+(defun output-post-atom-entry (blog-post output)
+  "Output an atom entry for the post."
+  (cxml:with-element "entry"
+    (cxml:attribute "xml:base" (base-url))
+    (cxml:with-element "title"
+      (cxml:text (content-title blog-post)))
+    (cxml:with-element "link"
+      (cxml:attribute "href" (funcall *id-generator-fn* blog-post)))
+    (cxml:with-element "id" ;; TODO - fixme
+      (cxml:text (url-for blog-post)))
+    (cxml:with-element "published"
+      (cxml:text
+       (local-time:format-rfc3339-timestring
+	nil (local-time:universal-to-timestamp (content-when blog-post)))))
+    (cxml:with-element "updated" ;; TODO - fixme
+      (cxml:text
+       (local-time:format-rfc3339-timestring
+	nil (local-time:universal-to-timestamp (content-when blog-post)))))
+    (cxml:with-element "summary"
+      (cxml:attribute "type" "xhtml")
+      (cxml:with-element "div"
+	(cxml:attribute "xmlns" *xhtml-xmlns*)
+	(cxml:text "") ; force end of div start tag
+	(output-post-synopsis blog-post output)))
+    (cxml:with-element "content"
+      (cxml:attribute "type" "xhtml")
+      (cxml:with-element "div"
+	(cxml:attribute "xmlns" *xhtml-xmlns*)
+	(cxml:text "") ; force end of div start tag
+	(output-post-content-no-template blog-post output)))))
 
 ;;; Generates the atom feed by finding a list of recent posts, and listing
 ;;; links to them with the full contents of each.
@@ -1095,16 +1192,15 @@ the templates)."
 		:element-type '(unsigned-byte 8) :if-exists :supersede)
       (let* ((output (cxml:make-octet-stream-sink stream :canonical nil
 						  :indentation nil
-						  :omit-xml-declaration-p nil))
-	     (tapped (klacks:make-tapping-source template output)))
+						  :omit-xml-declaration-p nil)))
 	(with-xml-fragment-output output
-	  (klacks:find-element tapped "updated")
+	  (%copy-to-next-start-element template output "updated")
+	  (klacks:serialize-event template output)
 	  (cxml:text (local-time:format-rfc3339-timestring nil (local-time:now)))
-	  (klacks:consume tapped)
-	  (klacks:consume tapped)
+	  (klacks:serialize-event template output)
 	  (loop for blog-post in collection
 	     do (output-post-atom-entry blog-post output))
-	  (klacks:find-event tapped :end-document)))))
+	  (klacks:serialize-source template output)))))
   (setf (dirty atom-feed) nil))
 
 
@@ -1115,10 +1211,6 @@ the templates)."
   (setf *id-generator-fn* #'url-for))
 
 ;;; Hacks
-(defun recent-posts ()
-  (with-open-store ()
-    (%recent-posts)))
-
 (defun drop-all-yes-i-know-what-i-am-doing ()
   (with-open-store ()
     (elephant:drop-instances
