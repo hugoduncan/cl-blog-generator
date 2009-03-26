@@ -10,6 +10,8 @@
 
 ;;;# Configuration
 ;;; These are the special variables used to control the blog generator's behaviour.
+(defvar *blog-title* nil
+  "The blog's title.")
 (defvar *blog-db-spec* nil
   "The database to be used by elephant to maintain blog metadata.")
 (defvar *blog-domain* nil
@@ -22,8 +24,6 @@
   "The local directory that will contain the published posts.")
 (defvar *template-path* nil
   "The local directory that contains the xhtml templates.")
-(defvar *dtd-path* nil
-  "The local directory that contains the xhtml dtd.")
 
 
 ;;; Optional configuration for customising the behaviour of the system
@@ -51,6 +51,8 @@
     (blog-post . "post"))
   "Default file extensions for the published content.")
 
+(defvar *category-scheme-uri* nil
+  "URI for category scheme.  If left null this will be generated to point to the tags page.")
 
 ;;; Tags used for identifying elements
 (defparameter *xhtml-xmlns* "http://www.w3.org/1999/xhtml")
@@ -72,6 +74,10 @@
 (defparameter *element-id* "id")
 (defparameter *element-class* "class")
 
+(defparameter *feed-title* "title")
+(defparameter *feed-uri* "id")
+(defparameter *feed-updated* "updated")
+
 (defparameter *post-content-id* "post"
   "ID of element to contain the post content")
 (defparameter *post-title-id* "post-title"
@@ -82,6 +88,7 @@
   "ID of element to contain the post updated date")
 (defparameter *post-posts-id* "posts"
   "ID of element to contain the posts list")
+
 
 (defparameter *publish-xml-indentation* nil)
 
@@ -202,11 +209,12 @@ The end-element event will be consumed but not output."
 
 (defun %copy-current-element (source sink)
   "When called with an un-output start-element, copy the current element."
-  (loop with depth = 1
+  (loop with depth = 0
      for key = (klacks:peek source)
-     do (when (and (eql key :end-element) (zerop (decf depth)))
+     do
+       (when (and (eql key :end-element) (zerop (decf depth)))
 	  (return nil))
-       (when (eql key :end-element)
+       (when (eql key :start-element)
 	 (incf depth))
        (klacks:serialize-event source sink))
   (klacks:serialize-event source sink))
@@ -306,6 +314,11 @@ to SINK."
   "Base url-for the blog."
   (format nil "http://~A~A" *blog-domain* *blog-root-path*))
 
+(defun atom-category-scheme ()
+  "URI for the category scheme in the ATOM feed."
+  (or *category-scheme-uri*
+      (format nil "http://~A~Atags" *blog-domain* *blog-root-path*)))
+
 (defun relative-directory-for (item)
   (append (list :relative) (funcall *page-relative-path-fn* item)))
 
@@ -314,7 +327,6 @@ to SINK."
 
 
 ;;;# Database
-
 
 ;;;## Generated Content Persistent Classes
 ;;; The various types of pages are handled by their own class.
@@ -326,10 +338,26 @@ to SINK."
   (:metaclass elephant:persistent-metaclass)
   (:documentation "Base for anything that can be generated."))
 
+;;;### Atom feed
+(defclass atom-feed (generated-content)
+  ((title :initarg :title :accessor atom-feed-title)
+   (uri :initarg :uri :accessor atom-feed-uri))
+  (:metaclass elephant:persistent-metaclass)
+  (:documentation "Page for an atom feed."))
+
+(defmethod site-file-path-for ((atom-feed atom-feed))
+  (make-pathname :name "feed.atom" :defaults *site-path*))
+
+;; (defun atom-feed ()
+;;   "Obtain the singleton atom feed."
+;;   (or (first (elephant:get-instances-by-class 'atom-feed))
+;;       (make-instance 'atom-feed)))
+
 
 ;;;### Index page
 (defclass index-page (generated-content)
-  ((tag :initarg :tag :initform nil :reader tag-page-tag))
+  ((feed :initform (make-instance 'atom-feed :title *blog-title*
+				  :uri (base-url)) :accessor content-feed))
   (:metaclass elephant:persistent-metaclass)
   (:documentation "Page for the main index."))
 
@@ -344,20 +372,6 @@ to SINK."
   "Obtain the singleton index page."
   (or (first (elephant:get-instances-by-class 'index-page))
       (make-instance 'index-page)))
-
-;;;### Atom feed
-(defclass atom-feed (generated-content)
-  ((tag :initarg :tag :initform nil :reader tag-page-tag))
-  (:metaclass elephant:persistent-metaclass)
-  (:documentation "Page for the main feed."))
-
-(defmethod site-file-path-for ((atom-feed atom-feed))
-  (make-pathname :name "feed.atom" :defaults *site-path*))
-
-(defun atom-feed ()
-  "Obtain the singleton atom feed."
-  (or (first (elephant:get-instances-by-class 'atom-feed))
-      (make-instance 'atom-feed)))
 
 
 ;;;### Tag pages
@@ -565,7 +579,7 @@ to SINK."
 ;;; Generate a blog post from an input post file.  The post is read and a
 ;;; published post file is created.  Metadata for the post is read and stored in
 ;;; the database.  Optionally, the site is regenerated.  The output page for
-;;; the post is always generated, so it may be proofed
+;;; the post is always generated, so it may be proofed.
 (defun publish-draft (path &key (generate-site nil))
   "Publish the draft post at the specified filesystem PATH. Returns a list with
 the path to the published file and the site path."
@@ -582,7 +596,7 @@ the path to the published file and the site path."
 
 ;;; Republishing uses the "updated" element in the "head" to set the updated time
 ;;; on the post.  If no "updated" is present, then one is added eith the current
-;;; date
+;;; date.
 (defun publish-updated-post (path &key (generate-site nil))
   "Publish an updated post at the specified filesystem PATH. Returns a list with
 the path to the published file and the site path."
@@ -736,8 +750,7 @@ when (day month year), updated (day month year), tags, linkname, description, an
   "Mark as dirty anything that the post should cause to be regenerated"
   (let ((recent-posts (%recent-posts)))
     (when (find blog-post recent-posts)
-      (setf (dirty (index-page)) t)
-      (setf (dirty (atom-feed)) t))
+      (setf (dirty (index-page)) t))
     (multiple-value-bind (prior next) (%adjacent-posts blog-post)
       (when prior
 	(setf (dirty prior) t))
@@ -748,7 +761,6 @@ when (day month year), updated (day month year), tags, linkname, description, an
 (defun %mark-all-dirty ()
   "Mark everything as dirty."
   (setf (dirty (index-page)) t)
-  (setf (dirty (atom-feed)) t)
   (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'blog-post)
   (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'page))
 
@@ -796,7 +808,7 @@ when (day month year), updated (day month year), tags, linkname, description, an
 	(cxml:attribute *post-name* *post-description*)
 	(cxml:attribute *post-content* description)))))
 
-(defparameter *element-dispatch-table*
+(defparameter *metadata-dispatch-table*
   (list
     (cons *post-when*  #'write-post-when)
     (cons *post-title*  #'write-post-title)
@@ -821,7 +833,7 @@ then this code will not be executed)."
 					*post-linkname* *post-template*))
 	     (description-written-p nil))
 	(labels ((write-element (name)
-		   (funcall (cdr (assoc name *element-dispatch-table* :test #'string=))
+		   (funcall (cdr (assoc name *metadata-dispatch-table* :test #'string=))
 			    blog-post)))
 	  (with-xml-fragment-output output
 	    (loop do
@@ -959,8 +971,8 @@ the templates)."
     (cons *post-title-id*  #'output-post-title)
     (cons *post-when-id* #'output-post-when)
     (cons *post-updated-id*  #'output-post-updated)
-    (cons *post-posts-id*  #'output-post-synopses-with-links)))
-
+    (cons *post-posts-id*  #'output-post-synopses-with-links))
+  "Map elements with specific id atributes to content.")
 
 
 (defun output-link-for (blog-post template output attributes)
@@ -987,9 +999,41 @@ attribute."
 
 (defparameter *class-dispatch-table*
   (list
-   (cons *page-link-for* #'output-link-for)))
+   (cons *page-link-for* #'output-link-for))
+  "Map elements with specific class atributes to content.")
+
+
+(defun output-feed-title (atom-feed template output attributes)
+  (declare (ignore attributes))
+  "Output the feed title."
+  (with-existing-element (template output)
+    (cxml:text (atom-feed-title atom-feed))))
+
+(defun output-feed-uri (atom-feed template output attributes)
+  (declare (ignore attributes))
+  "Output the feed uri."
+  (with-existing-element (template output)
+    (cxml:text (atom-feed-uri atom-feed))))
+
+(defun output-feed-updated (atom-feed template output attributes)
+  (declare (ignore atom-feed attributes))
+  "Output the feed updated date."
+  (with-existing-element (template output)
+    (cxml:text (local-time:format-rfc3339-timestring nil (local-time:now)))))
+
+(defparameter *feed-element-dispatch-table*
+  (list
+   (cons *feed-title* #'output-feed-title)
+   (cons *feed-uri* #'output-feed-uri)
+   (cons *feed-updated* #'output-feed-updated))
+  "Map specific elements to content.")
+
+(defparameter *element-dispatch-table*
+  '()
+  "Map specific elements to content.")
 
 (defmacro with-each-word ((var string) &body body)
+  "Split STRING into space seperated words."
   (let ((i (gensym))
 	(j (gensym))
 	(s (gensym)))
@@ -1001,12 +1045,22 @@ attribute."
 	     ,@body)
 	while ,j)))
 
+;;; The template rewriting function
 (defun output-with-rewrite (templated-content source output)
   "Outputs a SOURCE, rewriting content as required to the OUTPUT sink.  Writes
 only the current element."
   (flet ((dispatch (cmd attributes)
 	   (when cmd
-	     (funcall (cdr cmd) templated-content source output attributes))))
+	     (funcall (cdr cmd) templated-content source output attributes)))
+	 (element-cmd (lname)
+	   (assoc lname *element-dispatch-table* :test #'string=))
+	 (id-cmd (attributes)
+	   (assoc (cdr (assoc :id attributes)) *id-dispatch-table* :test #'string=))
+	 (class-cmd (attributes)
+	   (with-each-word (c (cdr (assoc :class attributes)))
+	     (let ((cmd (assoc c *class-dispatch-table* :test #'string=)))
+	       (when cmd
+		 (return cmd))))))
     (loop for key = (klacks:peek source)
        while (eql key :characters)
        do (klacks:serialize-event source output))
@@ -1018,21 +1072,12 @@ only the current element."
 	 (cond
 	   ((eql :start-element key)
 	    (let* ((attributes (%capture-attributes source))
-		   (id (assoc :id attributes))
-		   (class (assoc :class attributes))
-		   (id-cmd (assoc (cdr id) *id-dispatch-table* :test #'string=))
-		   (class-cmds))
-	      (unless id-cmd
-		(with-each-word (c (cdr class))
-		  (let ((cmd (assoc c *class-dispatch-table* :test #'string=)))
-		    (when cmd
-		      (push cmd class-cmds)))))
-	      (cond
-		(id-cmd
-		 (dispatch id-cmd attributes))
-		((plusp (length class-cmds))
-		 (dispatch (first class-cmds) attributes))
-		(t
+		   (cmd (or (element-cmd lname)
+			    (id-cmd attributes)
+			    (class-cmd attributes))))
+	      (if cmd
+		(dispatch cmd attributes)
+		(progn
 		 (incf depth)
 		 (klacks:serialize-event source output)))))
 	   ((eql :end-element key)
@@ -1058,7 +1103,8 @@ only the current element."
 (defmethod generate ((index-page index-page))
   (unless *recent-posts*
     (setf *recent-posts* (%recent-posts)))
-  (generate-page index-page :collection *recent-posts*))
+  (generate-page index-page :collection *recent-posts*)
+  (generate-page (content-feed index-page) :collection *recent-posts*))
 
 (defmethod generate ((atom-feed atom-feed))
   (unless *recent-posts*
@@ -1148,7 +1194,6 @@ only the current element."
   (setf (dirty index-page) nil))
 
 
-
 (defun output-post-atom-entry (blog-post output)
   "Output an atom entry for the post."
   (cxml:with-element "entry"
@@ -1167,6 +1212,17 @@ only the current element."
       (cxml:text
        (local-time:format-rfc3339-timestring
 	nil (local-time:universal-to-timestamp (content-when blog-post)))))
+    (cxml:with-element "published"
+      (cxml:text
+       (local-time:format-rfc3339-timestring
+	nil (local-time:universal-to-timestamp (content-when blog-post)))))
+    (loop
+       with scheme = (atom-category-scheme)
+       for tag in (content-tags blog-post)
+       do
+	 (cxml:with-element "category"
+	   (cxml:attribute "scheme" scheme)
+	   (cxml:attribute "term" tag)))
     (cxml:with-element "summary"
       (cxml:attribute "type" "xhtml")
       (cxml:with-element "div"
@@ -1180,8 +1236,8 @@ only the current element."
 	(cxml:text "") ; force end of div start tag
 	(output-post-content-no-template blog-post output)))))
 
-;;; Generates the atom feed by finding a list of recent posts, and listing
-;;; links to them with the full contents of each.
+;;; Generates the atom feed of recent posts, listing links to them with the full
+;;; contents of each.
 (defmethod generate-page ((atom-feed atom-feed) &key collection)
   "Generate the atom feed for the blog."
   (format t "Generating Atom feed~%")
@@ -1194,10 +1250,15 @@ only the current element."
 						  :indentation nil
 						  :omit-xml-declaration-p nil)))
 	(with-xml-fragment-output output
-	  (%copy-to-next-start-element template output "updated")
+	  (%copy-to-next-start-element template output "feed")
 	  (klacks:serialize-event template output)
-	  (cxml:text (local-time:format-rfc3339-timestring nil (local-time:now)))
-	  (klacks:serialize-event template output)
+	  (let ((*element-dispatch-table* *feed-element-dispatch-table*))
+	    (output-with-rewrite atom-feed template output))
+
+;; 	  (%copy-to-next-start-element template output "updated")
+;; 	  (klacks:serialize-event template output)
+;; 	  (cxml:text (local-time:format-rfc3339-timestring nil (local-time:now)))
+;; 	  (klacks:serialize-event template output)
 	  (loop for blog-post in collection
 	     do (output-post-atom-entry blog-post output))
 	  (klacks:serialize-source template output)))))

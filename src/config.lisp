@@ -5,32 +5,32 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *development-environment*
-    '((:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog_dev" "duncan" "")))
+    '((:blog-title . "cl-blog-generator Development Blog")
+      (:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog_dev" "duncan" "")))
       (:blog-domain . "hugoduncan.github.com")
       (:blog-root-path . "/cl-blog-generator/content/site/") ;; should end in /
       (:site-path . #p"/Users/duncan/projects/blog/content/site/")
       (:published-path . #p"/Users/duncan/projects/blog/content/published/")
-      (:dtd-path . #p"/Users/duncan/projects/blog/dtd/")
       (:template-path . #p"/Users/duncan/projects/blog/content/template/"))
     "My development environment")
 
   (defparameter *test-environment*
-    '((:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog_test" "duncan" "")))
+    '((:blog-title . "test blog")
+      (:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog_test" "duncan" "")))
       (:blog-domain . "hugoduncan.org")
       (:blog-root-path . "/blog/") ;; should end in /
       (:site-path . #p"/Users/duncan/projects/blog/test/site/")
       (:published-path . #p"/Users/duncan/projects/blog/test/published/")
-      (:dtd-path . #p"/Users/duncan/projects/blog/dtd/")
       (:template-path . #p"/Users/duncan/projects/blog/test/template/"))
     "My test environment")
 
   (defparameter *production-environment*
-    '((:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog" "duncan" "")))
+    '((:blog-title . "Hugo Duncan's Blog")
+      (:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog" "duncan" "")))
       (:blog-domain . "hugoduncan.org")
       (:blog-root-path . "/") ;; should end in /
       (:site-path . #p"/Users/duncan/Sites/")
       (:published-path . #p"/Users/duncan/blog/published/")
-      (:dtd-path . #p"/Users/duncan/projects/blog/dtd/")
       (:template-path . #p"/Users/duncan/blog/template/"))
     "My production environment")
 
@@ -39,4 +39,3 @@
   (set-environment :production *production-environment*)
   (configure :production))
 
-;; (setf cxml:*catalog* (cxml:make-catalog '("/opt/local/etc/xml/catalog")))
