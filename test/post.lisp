@@ -35,8 +35,6 @@
     (elephant:drop-instances
      (elephant:get-instances-by-class 'cl-blog-generator::index-page))
     (elephant:drop-instances
-     (elephant:get-instances-by-class 'cl-blog-generator::atom-feed))
-    (elephant:drop-instances
      (elephant:get-instances-by-class 'cl-blog-generator::tag-page))
     (elephant:drop-instances
      (elephant:get-instances-by-class 'cl-blog-generator::generated-content)
@@ -365,3 +363,30 @@
 	(is (string= pfe (namestring pf)))
 	(is (cl-fad:file-exists-p sfe))
 	(is (cl-fad:file-exists-p pfe))))))
+
+(deftest test-tag-page-protocol ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (let ((tag-page (make-instance 'cl-blog-generator::tag-page :tag "atag")))
+	(is (string= (format nil "~Atag/atag.xhtml" cl-blog-generator::*site-path*)
+		     (namestring (cl-blog-generator::site-file-path-for tag-page))))
+	(is (string= "/blog/tag/atag.xhtml"
+		     (namestring (cl-blog-generator::path-for tag-page))))))))
+
+(deftest test-%ensure-tag-pages-for ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (multiple-value-bind (output-path blog-post)
+	  (cl-blog-generator::%publish-draft (draft-path "first"))
+	(declare (ignore output-path))
+	(is (= 2 (length (cl-blog-generator::content-tags blog-post))))
+	(is (= 2 (length (elephant:get-instances-by-class 'cl-blog-generator::tag-page))))
+	(loop
+	   for tag in (cl-blog-generator::content-tags blog-post)
+	   for tag-page = (elephant:get-instance-by-value 'cl-blog-generator::tag-page
+							  'cl-blog-generator::tag tag)
+	   do
+	     (is tag-page)
+	     (is (= 1 (length (cl-blog-generator::tag-page-related-tags tag-page))))
+	     (is (= 1 (length (cl-blog-generator::%tag-posts tag))))
+	     (is (equal (first (cl-blog-generator::%tag-posts tag)) blog-post)))))))

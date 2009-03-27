@@ -25,7 +25,7 @@
     "My test environment")
 
   (defparameter *production-environment*
-    '((:blog-title . "Hugo Duncan's Blog")
+    '((:blog-title . "Hugo Duncan")
       (:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog" "duncan" "")))
       (:blog-domain . "hugoduncan.org")
       (:blog-root-path . "/") ;; should end in /

@@ -39,6 +39,8 @@
   "Default path list for BLOG-POST content.")
 (defvar *page-path* '("page")
   "Default path list for PAGE content.")
+(defvar *tag-page-path* '("tag")
+  "Default path list for TAG-PAGE content.")
 
 (defvar *blog-post-template* "post"
   "Template to use for each blog-post")
@@ -66,6 +68,7 @@
 (defparameter *post-head* "head")
 (defparameter *post-body* "body")
 (defparameter *post-meta* "meta")
+(defparameter *post-link* "link")
 (defparameter *post-description* "description")
 (defparameter *post-name* "name")
 (defparameter *post-content* "content")
@@ -73,6 +76,11 @@
 (defparameter *page-link-for* "page-link-for")
 (defparameter *element-id* "id")
 (defparameter *element-class* "class")
+
+(defparameter *rel-alternate* "alternate")
+(defparameter *atom-mime* "application/atom+xml")
+
+(defparameter *href* "href")
 
 (defparameter *feed-title* "title")
 (defparameter *feed-uri* "id")
@@ -88,6 +96,12 @@
   "ID of element to contain the post updated date")
 (defparameter *post-posts-id* "posts"
   "ID of element to contain the posts list")
+(defparameter *post-tags-class* "post-tags"
+  "Class of element to contain the post's tags")
+(defparameter *tag-name-class* "tag-name"
+  "Class of element to contain the tag's name")
+(defparameter *tag-related-class* "tags-related"
+  "Class of element to contain the tag's related tags")
 
 
 (defparameter *publish-xml-indentation* nil)
@@ -240,9 +254,7 @@ The end-element event will be consumed but not output."
   (let (attribs)
     (flet ((attribute-mapper (ns lname qname attrib-value explicit-p)
 	     (declare (ignore ns qname explicit-p))
-	     (push (cons (intern (string-upcase lname) 'KEYWORD)
-			 (or (parse-integer attrib-value :junk-allowed t)
-			     attrib-value)) attribs)))
+	     (push (cons lname attrib-value) attribs)))
       (klacks:map-attributes #'attribute-mapper source)
       (values attribs))))
 
@@ -339,31 +351,28 @@ to SINK."
   (:documentation "Base for anything that can be generated."))
 
 ;;;### Atom feed
-(defclass atom-feed (generated-content)
+(defclass atom-feed ()
   ((title :initarg :title :accessor atom-feed-title)
-   (uri :initarg :uri :accessor atom-feed-uri))
-  (:metaclass elephant:persistent-metaclass)
+   (uri :initarg :uri :accessor atom-feed-uri)
+   (content-page :initarg :content-page :reader content-page))
   (:documentation "Page for an atom feed."))
 
 (defmethod site-file-path-for ((atom-feed atom-feed))
-  (make-pathname :name "feed.atom" :defaults *site-path*))
+  (make-pathname :type "atom" :defaults (site-file-path-for (content-page atom-feed))))
 
-;; (defun atom-feed ()
-;;   "Obtain the singleton atom feed."
-;;   (or (first (elephant:get-instances-by-class 'atom-feed))
-;;       (make-instance 'atom-feed)))
+(defmethod path-for ((atom-feed atom-feed))
+  (make-pathname :type "atom" :defaults (path-for (content-page atom-feed))))
 
 
 ;;;### Index page
 (defclass index-page (generated-content)
-  ((feed :initform (make-instance 'atom-feed :title *blog-title*
-				  :uri (base-url)) :accessor content-feed))
+  ((feed :accessor content-feed :transient t))
   (:metaclass elephant:persistent-metaclass)
   (:documentation "Page for the main index."))
 
 (defmethod site-file-path-for ((index-page index-page))
   (declare (ignore index-page))
-  (make-pathname :name "index.xhtml" :defaults *site-path*))
+  (make-pathname :name "index" :type "xhtml" :defaults *site-path*))
 
 (defmethod path-for ((index-page index-page))
   (format nil "~Aindex.xhtml" *blog-root-path*))
@@ -373,12 +382,18 @@ to SINK."
   (or (first (elephant:get-instances-by-class 'index-page))
       (make-instance 'index-page)))
 
+(defmethod shared-initialize :after
+    ((index-page index-page) slot-names &key &allow-other-keys)
+  (with-slots (feed) index-page
+    (setf feed
+	  (make-instance 'atom-feed
+			 :title *blog-title*
+			 :uri (base-url)
+			 :content-page index-page))))
 
-;;;### Tag pages
-(defclass tag-page (generated-content)
-  ((tag :initarg :tag :initform nil :reader tag-page-tag))
-  (:metaclass elephant:persistent-metaclass)
-  (:documentation "Page for content matching a tag."))
+(defmethod content-title ((index-page index-page))
+  "The blog title is returned as empty in the expectation that it is specified in the template"
+  "")
 
 ;;;### Templated content
 ;;; All content that uses a template to merge user written content.
@@ -447,6 +462,48 @@ to SINK."
     (values year)))
 
 
+
+;;;### Tag pages
+(defclass tag-page (generated-content)
+  ((filename :initarg :filename :reader content-filename)
+   (tag :initarg :tag :initform nil :reader tag-page-tag :index t)
+   (related-tags :initarg :related-tags :initform nil :accessor tag-page-related-tags)
+   (feed :accessor content-feed :transient t))
+  (:metaclass elephant:persistent-metaclass)
+  (:documentation "Page for content matching a tag."))
+
+(defmethod shared-initialize :after
+    ((tag-page tag-page) slot-names &key &allow-other-keys)
+  (with-slots (feed tag filename) tag-page
+    (setf filename (%sanitise-title tag))
+    (unless (and (slot-boundp tag-page 'feed) feed)
+      (setf feed
+	    (make-instance 'atom-feed
+			   :title (format nil "~A : ~A" *blog-title* tag)
+			   :uri (url-for tag-page)
+			   :content-page tag-page)))))
+
+
+(defmethod relative-path-for ((tag-page tag-page))
+  "Relative path for a tag page"
+  *tag-page-path*)
+
+(defmethod path-for ((tag-page tag-page))
+  (format nil "~A~A~A.xhtml" *blog-root-path*
+	  (relative-namestring-for tag-page)
+	  (content-filename tag-page)))
+
+(defmethod site-file-path-for ((tag-page tag-page))
+  "Find the site file path for the specified TAG-PAGE."
+  (ensure-directories-exist
+   (merge-pathnames
+    (make-pathname :directory (relative-directory-for tag-page)
+		   :name (content-filename tag-page)
+		   :type "xhtml") *site-path*)))
+
+(defmethod content-title ((tag-page tag-page))
+  (tag-page-tag tag-page))
+
 ;;;### Page
 ;;; A user written page that is meant to be updated over time, and is not a blog post
 (defclass page (templated-content)
@@ -464,7 +521,7 @@ to SINK."
   (cxml:with-element "span"
     (cxml:attribute "class" "page-link")
     (cxml:with-element "a"
-      (cxml:attribute "href" (or url (path-for page)))
+      (cxml:attribute *href* (or url (path-for page)))
       (cxml:text (content-title page)))))
 
 
@@ -493,9 +550,18 @@ to SINK."
   (cxml:with-element "span"
     (cxml:attribute "class" "post-link")
     (cxml:with-element "a"
-      (cxml:attribute "href" (or url (path-for blog-post)))
+      (cxml:attribute *href* (or url (path-for blog-post)))
       (cxml:text (content-title blog-post)))))
 
+(defmethod link-for ((tag-page tag-page) &key url)
+  (cxml:with-element "span"
+    (cxml:attribute "class" "tag")
+    (cxml:with-element "a"
+      (cxml:attribute *href* (or url (path-for tag-page)))
+      (cxml:text (tag-page-tag tag-page)))))
+
+(defmethod content-feed ((blog-post blog-post))
+  (content-feed (index-page)))
 
 ;;;## Dates
 
@@ -535,6 +601,16 @@ to SINK."
 	 do
 	   (multiple-value-setq (has-pair key value) (elephant:cursor-prev cursor))))))
 
+(defun %tag-posts (tag)
+  "Create a list of recent posts for a given tag."
+  (let ((posts))
+    (elephant:map-class
+     #'(lambda (x)
+	 (when (find tag (content-tags x) :test #'string=)
+	   (push x posts)))
+     'blog-post)
+    posts))
+
 (defun %map-dirty-content (fn)
   "Map all dirty conent."
   (labels ((wrapped-fn (key value)
@@ -543,7 +619,7 @@ to SINK."
 	       (funcall fn value)))
 	   (fn-for-class (class)
 	     (elephant:map-inverted-index #'wrapped-fn class 'dirty :value t)))
-    (mapc #'fn-for-class (list 'blog-post 'page 'index-page 'atom-feed))))
+    (mapc #'fn-for-class (list 'blog-post 'page 'index-page 'tag-page))))
 
 
 (defun %adjacent-posts (blog-post)
@@ -570,7 +646,6 @@ to SINK."
       (if has-pair
 	  (setf next (elephant::controller-recreate-instance elephant:*store-controller* value)))
       (values prior next))))
-
 
 
 
@@ -653,6 +728,7 @@ the path to the published file and the site path."
 			  description synopsis template)))
       (let* ((output-path (published-file-path-for content)))
 	(%publish-draft-updating-post-metadata path output-path content)
+	(%ensure-tag-pages-for content)
 	(%mark-connected-posts-dirty content)
 	(values output-path content)))))
 
@@ -686,6 +762,7 @@ the path to the published file and the site path."
       (let* ((output-path (make-pathname :type "tmp" :defaults path)))
 	(%publish-draft-updating-post-metadata path output-path existing-post)
 	(cl-fad:copy-file output-path path :overwrite t)
+	(%ensure-tag-pages-for existing-post)
 	(%mark-connected-posts-dirty existing-post)
 	(values output-path existing-post)))))
 
@@ -698,9 +775,9 @@ when (day month year), updated (day month year), tags, linkname, description, an
   (let (title tags post-when post-updated linkname description synopsis template)
     (labels ((decode-date (date-data)
 	       (when date-data
-		 (loop for key in '(:day :month :year)
-		    collect (cdr (assoc key date-data)))))
-	     )
+		 (loop for key in '("day" "month" "year")
+		    collect (parse-integer
+			     (cdr (assoc key date-data :test #'string=)))))))
       (klacks:with-open-source (post (cxml:make-source path :entity-resolver #'null-resolver))
 	(loop
 	do
@@ -712,8 +789,8 @@ when (day month year), updated (day month year), tags, linkname, description, an
 	     (setf post-updated (%capture-attributes post)))
 	    ((start-post-element-p key ns element *post-meta*)
 	     (let ((attribs (%capture-attributes post)))
-	       (when (string= *post-description* (cdr (assoc :name attribs)))
-		 (setf description (cdr (assoc :content attribs))))))
+	       (when (string= *post-description* (cdr (assoc "name" attribs :test #'string=)))
+		 (setf description (cdr (assoc "content" attribs :test #'string=))))))
 	    ((start-post-element-p key ns element *post-title*)
 	     (setf title (klacks:consume-characters post)))
 	    ((start-post-element-p key ns element *post-tag*)
@@ -762,7 +839,29 @@ when (day month year), updated (day month year), tags, linkname, description, an
   "Mark everything as dirty."
   (setf (dirty (index-page)) t)
   (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'blog-post)
-  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'page))
+  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'page)
+  (elephant:map-class #'(lambda (post) (setf (dirty post) t)) 'tag-page))
+
+
+(defun %ensure-tag-page (tag tags)
+  (let ((tag-page (or (elephant:get-instance-by-value 'tag-page 'tag tag)
+		      (make-instance 'tag-page :tag tag))))
+    (setf (dirty tag-page) t)
+    (setf (tag-page-related-tags tag-page)
+	  (delete tag
+		  (remove-duplicates
+		   (merge 'list (tag-page-related-tags tag-page)
+			  (copy-seq tags) #'string<)
+		   :test #'string=)
+		  :test #'string=))
+    (values tag-page)))
+
+(defun %ensure-tag-pages-for (content)
+  "Ensure tag pages exist for the tags in content."
+  (loop
+     with tags = (content-tags content)
+     for tag in tags
+     do (%ensure-tag-page tag tags)))
 
 ;;; Publish a draft by copying it to the published path, adding the
 ;;; "post-when" element.  This ensures that all meta-data is in the
@@ -850,7 +949,8 @@ then this code will not be executed)."
 		      (%suppress-current-element draft))
 		     ((start-post-element-p key ns lname *post-meta*)
 		      (let ((attribs (%capture-attributes draft)))
-			(if (string= *post-description* (cdr (assoc :name attribs)))
+			(if (string= *post-description*
+				     (cdr (assoc "name" attribs :test #'string=)))
 			    (progn
 			      (write-post-description blog-post)
 			      (setf description-written-p t)
@@ -926,6 +1026,22 @@ the templates)."
   (with-existing-element (template output)
     (cxml:text (content-title blog-post))))
 
+(defun output-post-link (content template output attributes)
+  "Output link element for feed"
+  (let ((rel (assoc "rel" attributes :test #'string=))
+	(type (assoc "type" attributes :test #'string=)))
+    (if (and (string= *rel-alternate* (cdr rel))
+	     (string= *atom-mime* (cdr type)))
+	(progn
+	  (%suppress-current-element template)
+	  (cxml:with-element *post-link*
+	    (setf (cdr (assoc "href" attributes :test #'string=))
+		  (namestring (path-for (content-feed content))))
+	    (mapc #'(lambda (x)
+		      (cxml:attribute (car x) (cdr x)))
+		  attributes)))
+	(with-existing-element (template output)))))
+
 (defun output-post-when (blog-post template output attributes)
   (declare (ignore attributes))
   (with-existing-element (template output)
@@ -979,7 +1095,7 @@ the templates)."
   "Output a link for the specified post or page specified in the href
 attribute."
   (declare (ignore blog-post))
-  (let* ((href-entry (assoc :href attributes))
+  (let* ((href-entry (assoc *href* attributes :test #'string=))
 	 (linkname (%sanitise-title (cdr href-entry)))
 	 (linked-content
 	  (some #'(lambda (class)
@@ -989,17 +1105,51 @@ attribute."
       (setf (cdr href-entry) (url-for linked-content))))
   (cxml:with-element "a"
     (mapc #'(lambda (x)
-	      (let* ((attrib (string-downcase (string (car x))))
-		     (a1 (make-array (length attrib) :element-type 'character :initial-contents attrib)))
-		(cxml:attribute a1 (cdr x))))  ;; not sure why we have to copy this
+	      (cxml:attribute (car x) (cdr x))
+;; 	      (let* ((attrib (string-downcase (string (car x))))
+;; 		     (a1 (make-array (length attrib) :element-type 'character :initial-contents attrib)))
+;; 		(cxml:attribute a1 (cdr x)))
+	      )  ;; not sure why we have to copy this
 	  attributes)
     (cxml:text "")
     (%copy-current-element-content template output)))
 
 
+(defun output-tags-for (content template output attributes)
+  (declare (ignore attributes))
+  (let ((tags (content-tags content)))
+    (flet ((output-post-tag (tag)
+	     (cxml:with-element "li"
+	       (let ((tag-page (%ensure-tag-page tag tags)))
+		 (link-for tag-page)))))
+      (with-existing-element (template output)
+	(cxml:with-element "ul"
+	  (mapc #'output-post-tag tags))))))
+
+(defun output-tag-name (content template output attributes)
+  (declare (ignore attributes))
+  (with-existing-element (template output)
+    (cxml:text (tag-page-tag content))))
+
+
+(defun output-tag-related (content template output attributes)
+  (declare (ignore attributes))
+  (let ((tags (tag-page-related-tags content)))
+    (flet ((output-post-tag (tag)
+	     (cxml:with-element "li"
+	       (let ((tag-page (%ensure-tag-page tag tags)))
+		 (link-for tag-page)))))
+      (with-existing-element (template output)
+	(cxml:with-element "ul"
+	  (mapc #'output-post-tag tags))))))
+
+
 (defparameter *class-dispatch-table*
   (list
-   (cons *page-link-for* #'output-link-for))
+   (cons *page-link-for* #'output-link-for)
+   (cons *post-tags-class* #'output-tags-for)
+   (cons *tag-name-class* #'output-tag-name)
+   (cons *tag-related-class* #'output-tag-related))
   "Map elements with specific class atributes to content.")
 
 
@@ -1029,7 +1179,9 @@ attribute."
   "Map specific elements to content.")
 
 (defparameter *element-dispatch-table*
-  '()
+  (list
+   (cons *post-title* #'output-post-title)
+   (cons *post-link* #'output-post-link))
   "Map specific elements to content.")
 
 (defmacro with-each-word ((var string) &body body)
@@ -1049,18 +1201,18 @@ attribute."
 (defun output-with-rewrite (templated-content source output)
   "Outputs a SOURCE, rewriting content as required to the OUTPUT sink.  Writes
 only the current element."
-  (flet ((dispatch (cmd attributes)
-	   (when cmd
-	     (funcall (cdr cmd) templated-content source output attributes)))
-	 (element-cmd (lname)
-	   (assoc lname *element-dispatch-table* :test #'string=))
-	 (id-cmd (attributes)
-	   (assoc (cdr (assoc :id attributes)) *id-dispatch-table* :test #'string=))
-	 (class-cmd (attributes)
-	   (with-each-word (c (cdr (assoc :class attributes)))
-	     (let ((cmd (assoc c *class-dispatch-table* :test #'string=)))
-	       (when cmd
-		 (return cmd))))))
+  (labels ((dispatch (cmd attributes)
+	     (when cmd
+	       (funcall (cdr cmd) templated-content source output attributes)))
+	   (element-cmd (lname)
+	     (assoc lname *element-dispatch-table* :test #'string=))
+	   (id-cmd (attributes)
+	     (assoc (cdr (assoc "id" attributes :test #'string=)) *id-dispatch-table* :test #'string=))
+	   (class-cmd (attributes)
+	     (with-each-word (c (cdr (assoc "class" attributes :test #'string=)))
+	       (let ((cmd (assoc c *class-dispatch-table* :test #'string=)))
+		 (when cmd
+		   (return cmd))))))
     (loop for key = (klacks:peek source)
        while (eql key :characters)
        do (klacks:serialize-event source output))
@@ -1106,10 +1258,15 @@ only the current element."
   (generate-page index-page :collection *recent-posts*)
   (generate-page (content-feed index-page) :collection *recent-posts*))
 
-(defmethod generate ((atom-feed atom-feed))
-  (unless *recent-posts*
-    (setf *recent-posts* (%recent-posts)))
-  (generate-page atom-feed :collection *recent-posts*))
+;; (defmethod generate ((atom-feed atom-feed))
+;;   (unless *recent-posts*
+;;     (setf *recent-posts* (%recent-posts)))
+;;   (generate-page atom-feed :collection *recent-posts*))
+
+(defmethod generate ((tag-page tag-page))
+  (let ((tag-posts (%tag-posts (tag-page-tag tag-page))))
+    (generate-page tag-page :collection tag-posts)
+    (generate-page (content-feed tag-page) :collection tag-posts)))
 
 
 
@@ -1172,7 +1329,7 @@ only the current element."
 
 
 
-;;; Generates the index page by finding a list of recent posts, and listing
+;;; Generates the index page using a list of recent posts, and listing
 ;;; links to them with a synopsis of each (the first paragraph, anyway).
 (defmethod generate-page ((index-page index-page) &key collection)
   "Generate the index page for the blog."
@@ -1192,6 +1349,29 @@ only the current element."
 	       do (klacks:serialize-event template output))
 	    (output-with-rewrite index-page template output))))))
   (setf (dirty index-page) nil))
+
+;;; Generates a tag page using a list of posts, and listing
+;;; links to them with a synopsis of each (the first paragraph, anyway).
+(defmethod generate-page ((tag-page tag-page) &key collection)
+  "Generate the index page for the blog."
+  (format t "Generating tag page ~A~%" (tag-page-tag tag-page))
+  (klacks:with-open-source (template (cxml:make-source (%template-path "tag")
+						       :entity-resolver #'null-resolver))
+    (with-open-file
+	(stream (site-file-path-for tag-page) :direction :output
+		:element-type '(unsigned-byte 8) :if-exists :supersede)
+      (let* ((output (cxml:make-octet-stream-sink
+		      stream :canonical nil :omit-xml-declaration-p nil)))
+	(with-xml-fragment-output output
+;; TODO
+;;   links to connected tags
+	  (let ((*index-collection* collection))
+	    (loop for key = (klacks:peek template)
+	       while key
+	       until (eql key :start-element)
+	       do (klacks:serialize-event template output))
+	    (output-with-rewrite tag-page template output))))))
+  (setf (dirty tag-page) nil))
 
 
 (defun output-post-atom-entry (blog-post output)
@@ -1262,7 +1442,8 @@ only the current element."
 	  (loop for blog-post in collection
 	     do (output-post-atom-entry blog-post output))
 	  (klacks:serialize-source template output)))))
-  (setf (dirty atom-feed) nil))
+  ;; (setf (dirty atom-feed) nil)
+  )
 
 
 ;;; Defaults for configuration
@@ -1282,6 +1463,10 @@ only the current element."
 (defun blog-index-page ()
   (site-file-path-for (index-page)))
 
+(defun ensure-tag-pages-for-existing-blog-posts ()
+  "Ensure tag pages exist for existing posts"
+  (with-open-store ()
+    (elephant:map-class #'%ensure-tag-pages-for 'blog-post)))
 ;;; ensure pbook output is as intended:
 
 ;; Local Variables:
