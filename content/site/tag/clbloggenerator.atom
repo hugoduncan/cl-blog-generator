@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xml:lang="en-us" xmlns="http://www.w3.org/2005/Atom">
+ <title>cl-blog-generatorcl-blog-generator Development Blog : cl-blog-generator</title>
+ <id>http://hugoduncan.github.com/cl-blog-generator/http://hugoduncan.github.com/cl-blog-generator/content/site/tag/clbloggenerator.xhtml</id>
+ <link href="./"/>
+ <link href="" rel="self"/>
+ <logo>rsslogo.jpg</logo>
+ <icon>/favicon.ico</icon>
+ <author><name>Hugo Duncan</name></author>
+ <subtitle>Development Blog</subtitle>
+ <rights>All content written by Hugo Duncan and photos by Hugo Duncan Copyright Hugo Duncan, all rights reserved.</rights>
+ <updated>2009-03-27T12:04:28.655989-04:00</updated>
+
+<entry xml:base="http://hugoduncan.github.com/cl-blog-generator/content/site/"><title>Blog Site Generators</title><link href="http://hugoduncan.github.com/cl-blog-generator/content/site/post/2009/blog_site_generators.xhtml"/><id>http://hugoduncan.github.com/cl-blog-generator/content/site/post/2009/blog_site_generators.xhtml</id><published>2009-03-26T20:00:00.000000-04:00</published><updated>2009-03-26T20:00:00.000000-04:00</updated><published>2009-03-26T20:00:00.000000-04:00</published><category scheme="http://hugoduncan.github.com/cl-blog-generator/content/site/tags" term="cl-blog-generator"/><category scheme="http://hugoduncan.github.com/cl-blog-generator/content/site/tags" term="lisp"/><category scheme="http://hugoduncan.github.com/cl-blog-generator/content/site/tags" term="blog"/><summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>
+I recently uploaded some links to my <a href="http://github.com/hugoduncan/cl-blog-generator">cl-blog-generator</a> project, and have been getting some feedback with comparisons to other blog site generators, or compilers, such as <a href="http://www.advogato.org/person/Stevey/">Steve Kemp</a>'s <a href="http://www.steve.org.uk/Software/chronicle/">Chronicle</a>, or <a href="http://github.com/mojombo/jekyll">Jekyll</a> as used on <a href="http://github.com/blog/272-github-pages">GitHub Pages</a>.  Compared to these, cl-blog-generator is immature, but takes a different approach in several areas that <a href="http://advogato.org/person/chalst/">Charles Stewart</a> suggested might be worth exploring.  I look forward to any comments you might have.
+</p></div></summary><content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>
+I recently uploaded some links to my <a href="http://github.com/hugoduncan/cl-blog-generator">cl-blog-generator</a> project, and have been getting some feedback with comparisons to other blog site generators, or compilers, such as <a href="http://www.advogato.org/person/Stevey/">Steve Kemp</a>'s <a href="http://www.steve.org.uk/Software/chronicle/">Chronicle</a>, or <a href="http://github.com/mojombo/jekyll">Jekyll</a> as used on <a href="http://github.com/blog/272-github-pages">GitHub Pages</a>.  Compared to these, cl-blog-generator is immature, but takes a different approach in several areas that <a href="http://advogato.org/person/chalst/">Charles Stewart</a> suggested might be worth exploring.  I look forward to any comments you might have.
+</p>
+<h3>Formatting</h3>
+<p>
+All the blog generators seem to use a file based approach for writing content, but they differ in the choice of input formats supported, and in the approach to templating.
+<code>cl-blog-generator</code> is the least flexible, requiring input in XHTML, while <code>Chronicle</code> allows HTML, Textile or Markdown, and <code>Jekyll</code> Textile or Markdown.  For templates, <code>Chronicle</code> uses Perl's <a href="http://search.cpan.org/~samtregar/HTML-Template-2.9/Template.pm">HTML::Template</a>, and <code>Jekyll</code> uses <a href="http://www.liquidmarkup.org/">Liquid</a>. <code>cl-blog-generator</code> uses an approach which substitutes content into elements identified with specific id's or classes, similar to transforming the templates with XSLT.
+</p>
+<p>
+<code>cl-blog-generator</code>'s choice of XHTML input was driven by a requirement to enable the validation of post content in the editor, which is not possible using <code>Chronicle</code>'s HTML input because of the headers and lack of a <code>body</code> or <code>head</code> element, and a desire to be able to use any CSS tricks I wanted, which ruled out Textile and Markdown, or any other markup language.  The lack of an external templating engine in <code>cl-blog-generator</code> was driven by simplicity; I couldn't see a use for conditionals or loops given the fixed structure of the content, and this choice leads to templates that validate, unlike <code>Jekyll</code>, and which are not full of HTML comments.  The current id and class naming scheme in <code>cl-blog-generator</code> could certainly use some refinement to improve the flexibility of the output content format, and I would definitely welcome requests for enhancements should the scheme not fit your requirements.
+</p>
+
+<h3>Database and Two Phase Publishing</h3>
+<p>
+Perhaps the most significant difference in approach for <code>cl-blog-generator</code> is its use of a database and an explicit publish step.  With <code>cl-blog-generator</code> a draft can exist anywhere in the filesystem, and must be "published" to be recognised by the blog site generator.  The publishing process fills in some default metadata, such as post date, if this is not originally specified, copies the modified draft to a configurable location, and enters the metadata into the database.  This ensures that the post is completely specified by its representation in the filesystem, and that the database is recreatable.
+</p>
+<p>
+The database enables the partial regeneration of the site, without having to parse the whole site, and makes the linking of content much simpler.
+However, having <a href="http://common-lisp.net/project/elephant/">Elephant</a> as a dependency is probably the largest impediment to installation at present.
+</p>
+
+<h3>On Titles, Dates, Tags and Filenames</h3>
+
+<p><code>cl-blog-generator</code>'s input XHTML has been augmented to add elements for specifying post title, date, update date (which I believe is missing from the other systems), slug, description, and tags.  On publising (see next section), any of these elements that is missing, except the mandatory title, is filled in with defaults.</p>
+
+<p>Both <code>Chronicle</code> and <code>Jekyll</code> use a preamble to specify metadata, with the filename being used to generate the post's slug. <code>Jekyll</code> also uses the filename and its path for specifying the post date, and tags.
+</p>
+
+
+<h3>Bells and Whistles</h3>
+
+<p>Finally, here is a grab bag of features.</p>
+<ul>
+<li>
+<code>Chronicle</code> comes with a commenting system.
+</li>
+<li>
+<code>cl-blog-generator</code> generates a <code>meta</code> description element, which is used by search engines to generate link text.  It also generates <code>meta</code> elements with links to the previous and next posts.
+</li>
+<li>
+<code>Jekyll</code> has a "Related posts" feature for generating links to similar posts.
+</li>
+
+<li> <code>Chronicle</code> and <code>Jekyll</code> both have migration scripts for importing content. </li>
+<li> <code>Chronicle</code> has a spooler for posting pre-written content at specific times</li>
+</ul>
+
+</div></content></entry></feed>
