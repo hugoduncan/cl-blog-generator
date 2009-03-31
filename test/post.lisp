@@ -18,6 +18,15 @@
        (is (string= expected (cl-blog-generator::%sanitise-title input)))))
 
 
+(defvar *fake-names*
+  '("Aaliyah" "Aaron" "Abagail" "Abbey" "Abbie" "Abbigail" "Abby" "Abdiel" "Abdul" "Abdullah" "Abe" "Abel" "Abelardo" "Abigail" "Abigale" "Abigayle" "Abner" "Abraham" "Ada" "Adah" "Adalberto" "Adaline" "Adam" "Adan" "Addie" "Addison" "Adela" "Adelbert" "Adele" "Adelia" "Adeline" "Adell" "Adella" "Adelle" "Aditya" "Adolf" "Adolfo" "Adolph" "Adolphus" "Adonis" "Adrain" "Adrian" "Adriana" "Adrianna" "Adriel" "Adrien" "Adrienne" "Afton" "Aglae" "Agnes" "Agustin" "Agustina" "Ahmad" "Ahmed" "Aida" "Aidan" "Aiden" "Aileen" "Aimee" "Aisha" "Aiyana" "Akeem" "Al" "Alaina" "Alan" "Alana" "Alanis" "Alanna" "Alayna" "Alba" "Albert" "Alberta" "Albertha" "Alberto" "Albin" "Albina" "Alda" "Alden" "Alec" "Aleen" "Alejandra" "Alejandrin" "Alek" "Alena" "Alene" "Alessandra" "Alessandro" "Alessia" "Aletha" "Alex" "Alexa" "Alexander" "Alexandra" "Alexandre" "Alexandrea" "Alexandria" "Alexandrine" "Alexandro" "Alexane" "Alexanne" "Alexie" "Alexis" "Alexys" "Alexzander" "Alf" "Alfonso" "Alfonzo" "Alford" "Alfred" "Alfreda" "Alfredo" "Ali" "Alia" "Alice" "Alicia" "Alisa" "Alisha" "Alison" "Alivia" "Aliya" "Aliyah" "Aliza" "Alize" "Allan" "Allen" "Allene" "Allie"))
+
+(defun random-element (list)
+  (nth (random (length list)) list))
+
+(defun fake-name ()
+  (random-element *fake-names*))
+
 (defmacro with-test-db (&body body)
 `(progn
    (configure :test)
@@ -28,17 +37,12 @@
 ;;;# Fixtures to revert output state
 (defun drop-all ()
   (with-test-db
-    (elephant:drop-instances
-     (elephant:get-instances-by-class (find-class 'cl-blog-generator::blog-post)))
-    (elephant:drop-instances
-     (elephant:get-instances-by-class (find-class 'cl-blog-generator::page)))
-    (elephant:drop-instances
-     (elephant:get-instances-by-class 'cl-blog-generator::index-page))
-    (elephant:drop-instances
-     (elephant:get-instances-by-class 'cl-blog-generator::tag-page))
-    (elephant:drop-instances
-     (elephant:get-instances-by-class 'cl-blog-generator::generated-content)
-     )))
+    (loop for class in '(cl-blog-generator::blog-post cl-blog-generator::page
+			 cl-blog-generator::index-page cl-blog-generator::tag-page
+			 cl-blog-generator::generated-content cl-blog-generator::comment)
+       do (elephant:drop-instances
+	   (elephant:get-instances-by-class class)))
+    ( )))
 
 (defun draft-path (filename &key (type "post"))
   (merge-pathnames
@@ -52,18 +56,72 @@
 (defixture delete-all-fixture
     (:setup
      (drop-all)
-     (cl-fad:walk-directory *site-path* #'delete-file)
-     (cl-fad:walk-directory *published-path* #'delete-file)))
+     (loop for dir in (list *site-path* *published-path*)
+	do
+	  (ensure-directories-exist dir)
+	  (cl-fad:walk-directory dir #'delete-file))))
 
 (defixture test-environment-fixture
     (:setup
      (configure :test)))
 
 (defun synopsis= (a b)
-  (declare (ignore a b))
-  ;; need to work out the type of the sysnopsis...
-  ;; (is (string= "<p>My first post.  Mainly to have something to use in developing the code.</p>" synopsis))
-  t)
+  (is (string= a (babel:octets-to-string b :encoding :utf-8))))
+
+(defparameter *template-tests*
+  '("fred<span>blogs</span>xxx"))
+
+
+(deftest test-split-fmt ()
+  (let ((components (cl-blog-generator::split-fmt nil)))
+    (is (null components)))
+  (let ((components (cl-blog-generator::split-fmt "one component")))
+    (is (listp components))
+    (is (= 1 (length components)))
+    (is (string= "one component" (first components))))
+  (let ((components (cl-blog-generator::split-fmt "first component|second component")))
+    (is (listp components))
+    (is (= 2 (length components)))
+    (is (string= "first component" (first components)))
+    (is (string= "second component" (second components))))
+  (let ((components (cl-blog-generator::split-fmt "first component|second component|third component")))
+    (is (listp components))
+    (is (= 3 (length components)))
+    (is (string= "first component" (first components)))
+    (is (string= "second component" (second components)))
+    (is (string= "third component" (third components))))
+  (let ((components (cl-blog-generator::split-fmt "first|second|")))
+    (is (listp components))
+    (is (= 3 (length components)))
+    (is (string= "first" (first components)))
+    (is (string= "second" (second components)))
+    (is (string= "" (third components)))))
+
+
+(deftest test-merge-assoc ()
+  (is (equalp '((:a . :a) (:b . :bb) (:c . :cc))
+	      (sort (cl-blog-generator::merge-assoc '((:a . :a) (:b . :b))
+						    '((:b . :bb) (:c . :cc)))
+		    #'(lambda (x y)
+			(string< (symbol-name (car x))
+				 (symbol-name (car y)))))))
+  (is (equalp '(("a" . "a") ("b" . "bb") ("c" . "cc"))
+	      (sort (cl-blog-generator::merge-assoc '(("a" . "a") ("b" . "b"))
+						    '(("b" . "bb") ("c" . "cc"))
+						    :test #'string=)
+		    #'(lambda (x y)
+			(string< (car x) (car y)))))))
+
+(deftest test-output-content-using-template-case (content)
+  (let ((template (babel:string-to-octets (format nil "<div>~A</div>" content)))
+	(output (cxml:make-octet-vector-sink)))
+    (cl-blog-generator::output-content-using-template nil template output)
+    (let ((result (sax:end-document output)))
+      (is (string= content (babel:octets-to-string result :encoding :utf-8))))))
+
+(deftest test-output-content-using-template ()
+  (loop for i in *template-tests* do (test-output-content-using-template-case i)))
+
 
 (deftest test-%parse-post-info-first ()
   (with-fixture test-environment-fixture
@@ -242,13 +300,14 @@
 		       (funcall cl-blog-generator::*id-generator-fn* blog-post)))
 
 
-	  (multiple-value-bind (title when updated tags linkname synopsis)
+	  (multiple-value-bind (title when updated tags linkname description synopsis)
 	      (cl-blog-generator::%parse-post-info output-path)
-	    (is (string= title "My Second Blog Post"))
+	    (is (string= "My Second Blog Post" title))
 	    (is (equalp '(26 02 2009) when))
 	    (is (equalp '("lisp" "blog") tags))
-	    (is (string= linkname "a_second_blog_post_with_an_explicit_linkname"))
+	    (is (string= "a_second_blog_post_with_an_explicit_linkname" linkname))
 	    (is (equalp '(27 02 2009) updated))
+	    (is (string= "A description" description))
 	    (is (synopsis=
 		 "<p>My second post.  With an explicit linkname, and an updated tag.</p>"
 		 synopsis))))))))
@@ -390,3 +449,56 @@
 	     (is (= 1 (length (cl-blog-generator::tag-page-related-tags tag-page))))
 	     (is (= 1 (length (cl-blog-generator::%tag-posts tag))))
 	     (is (equal (first (cl-blog-generator::%tag-posts tag)) blog-post)))))))
+
+
+(defvar *comment-texts*
+  '("This is a comment"
+    "This is a multi-paragraph comment
+
+Another paragraph."
+        "This is a multi-paragraph comment with http://somedomain.com/links .
+
+Another paragraph http://somedomain.com/links."))
+
+(defvar *comment-regexes*
+  '("<p>This is a comment</p>"
+    "<p>This is a multi-paragraph comment</p><p>Another paragraph.</p>"
+    "<a href=\"http://somedomain.com/links\">http://somedomain.com/links</a>"))
+
+
+(deftest test-add-comment ()
+  (with-fixture delete-all-fixture
+    (with-test-db
+      (multiple-value-bind (output-path blog-post)
+	  (cl-blog-generator::%publish-draft (draft-path "first"))
+	(declare (ignore output-path))
+	(loop for comment-text in *comment-texts*
+	     for comment-regex in *comment-regexes*
+	   do
+	     (let* ((name (fake-name))
+		    (comment (cl-blog-generator::add-comment
+			      (cl-blog-generator::content-filename blog-post)
+			      "123.123.123.123"
+			      name
+			      "ab.cd@ef.com"
+			      "http://freds domain"
+			      (get-universal-time)
+			      comment-text)))
+	       (is (eql blog-post (cl-blog-generator::content-page comment)))
+;; 	       (format *debug-io* "~A~%" (namestring (cl-blog-generator::published-file-path-for comment)))
+	       (is (string= name (cl-blog-generator::comment-name comment)))
+	       (is (string= (format nil "~A~{~A/~}~A/~A_~A.comment"
+				    *published-path*
+				    *comment-path*
+				    (cl-blog-generator::content-filename blog-post)
+				    (cl-blog-generator::comment-when comment)
+				    (cl-blog-generator::%sanitise-title name))
+			    (namestring (cl-blog-generator::published-file-path-for comment))))
+	       (is (probe-file (cl-blog-generator::published-file-path-for comment)))
+	       (with-open-file (stream (cl-blog-generator::published-file-path-for comment))
+		 (let ((line (read-line stream)))
+		   (is (cl-ppcre:scan comment-regex line))))))
+	(is (= 3 (cl-blog-generator::%btree-length (cl-blog-generator::content-comments blog-post))))
+	(cl-blog-generator::generate blog-post)))))
+
+

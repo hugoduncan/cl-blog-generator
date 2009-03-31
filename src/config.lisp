@@ -24,18 +24,7 @@
       (:template-path . #p"/Users/duncan/projects/blog/test/template/"))
     "My test environment")
 
-  (defparameter *production-environment*
-    '((:blog-title . "Hugo Duncan")
-      (:blog-db-spec . (:postmodern (:postgresql "127.0.0.1" "blog" "duncan" "")))
-      (:blog-domain . "hugoduncan.org")
-      (:blog-root-path . "/") ;; should end in /
-      (:site-path . #p"/Users/duncan/Sites/")
-      (:published-path . #p"/Users/duncan/blog/published/")
-      (:template-path . #p"/Users/duncan/blog/template/"))
-    "My production environment")
-
   (set-environment :test *test-environment*)
   (set-environment :development *development-environment*)
-  (set-environment :production *production-environment*)
-  (configure :production))
+  (configure :test))
 

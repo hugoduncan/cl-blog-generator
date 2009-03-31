@@ -13,12 +13,13 @@
   :maintainer "Hugo Duncan <hugo@hugoduncan.org>"
   :licence "BSD Open Source"
   :description "A generator for blog sites."
-  :depends-on (:cxml :cl-fad :elephant :local-time :flexi-streams)
+  :depends-on (:cxml :cl-fad :elephant :local-time :flexi-streams :mel-base :cl-ppcre :babel)
   :components
   ((:module "src"
 	    :components
 	    ((:file "package" )
-	     (:file "post" :depends-on ("package"))))))
+	     (:file "post" :depends-on ("package"))
+	     (:file "comment-mail" :depends-on ("post"))))))
 
 (defsystem #:cl-blog-generator-test
   :name "cl-blog-generator-test"

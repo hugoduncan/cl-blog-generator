@@ -9,7 +9,7 @@
  <author><name>Hugo Duncan</name></author>
  <subtitle>Development Blog</subtitle>
  <rights>All content written by Hugo Duncan and photos by Hugo Duncan Copyright Hugo Duncan, all rights reserved.</rights>
- <updated>2009-03-27T12:04:28.863264-04:00</updated>
+ <updated>2009-03-30T20:47:44.203652-04:00</updated>
 
 <entry xml:base="http://hugoduncan.github.com/cl-blog-generator/content/site/"><title>Blog Generator Design</title><link href="http://hugoduncan.github.com/cl-blog-generator/content/site/post/2009/blog_generator_design.xhtml"/><id>http://hugoduncan.github.com/cl-blog-generator/content/site/post/2009/blog_generator_design.xhtml</id><published>2009-03-03T19:00:00.000000-05:00</published><updated>2009-03-03T19:00:00.000000-05:00</updated><published>2009-03-03T19:00:00.000000-05:00</published><category scheme="http://hugoduncan.github.com/cl-blog-generator/content/site/tags" term="generator"/><category scheme="http://hugoduncan.github.com/cl-blog-generator/content/site/tags" term="blog"/><category scheme="http://hugoduncan.github.com/cl-blog-generator/content/site/tags" term="lisp"/><summary type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>I want to be able publish posts easily to a statically served site.  I am sure that there are lots of blog site generators out there, but I could not find one that I liked, and which was in a language I would enjoy hacking, and so I wrote my own.</p></div></summary><content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>I want to be able publish posts easily to a statically served site.  I am sure that there are lots of blog site generators out there, but I could not find one that I liked, and which was in a language I would enjoy hacking, and so I wrote my own.</p>
 
