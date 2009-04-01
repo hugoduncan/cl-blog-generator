@@ -149,7 +149,7 @@ else
  </head>
  <body>
   <h2>Thanks!</h2>
-  <p>Your comment will be included the next time this blog is rebuilt.</p>
+  <p>Your comment will be included the next time the comments are moderated.</p>
   <p><a href="$ENV{'HTTP_REFERER'}">Return to blog</a>.</p>
  </body>
 </html>

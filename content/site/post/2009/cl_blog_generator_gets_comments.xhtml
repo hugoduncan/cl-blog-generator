@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<link href="../../style.css" title="sans" media="screen" type="text/css" rel="stylesheet"/>
+<link href="../../feed.atom" title="Atom (full content)" type="application/atom+xml" rel="alternate"/>
+<title>cl-blog-generator : cl-blog-generator Gets Comments</title><link rel="prev" href="/cl-blog-generator/content/site/post/2009/blog_site_generators.xhtml" title="Blog Site Generators"/><meta name="description" content="I have now added a comment system to cl-blog-generator.  My requirements were for a simple, low overhead, commenting system, preferable one that could possibly be fully automated."/><meta name="keywords" content="advogato,cl-blog-generator,lisp"/>
+</head>
+<body>
+<div id="container">
+<div id="banner"><h1><span id="post-title">cl-blog-generator Gets Comments</span></h1></div>
+<div id="centercontent">
+<div id="post"><p>I have now added a comment system to <a href="http://github.com/hugoduncan/cl-blog-generator">cl-blog-generator</a>.  My requirements were for a simple, low overhead, commenting system, preferable one that could possibly be fully automated.</p>
+
+<p>The comment system was inspired by <a href="http://www.steve.org.uk/Software/chronicle/">Chronicle</a>'s, with a slight modification in approach - the comments are never saved on the web server, and are just sent by email to a dedicated email address.  Spam filtering is delegated to the whatever spam filtering is implemented on the mail server, or in your email client.  The comment emails are then processed in CL using <a href="http://common-lisp.net/project/mel-base/">mel-base</a> and written to the local filesystem.  Moderation can optionally occur on the CL side, if that is preferable to using the email client.</p>
+
+<p>There is still some work left to do - I would like to be able to switch off comments on individual posts, either on demand on after a default time period - but I thought I would let real world usage drive my development.</p>
+</div>
+</div>
+
+<div id="rightcontent">
+<div class="oo"><a href="../../index.xhtml" id="to-home"><span id="home">home</span></a></div>
+ <a href="" rel="me">source</a>
+ <a href="http://hugoduncan.org" rel="me">Hugo Duncan</a>
+<div class="vcard">
+  <a href="http://hugoduncan.org/" class="fn url">Hugo Duncan</a>
+  <div><a href="mailto:blogen@hugoduncan.org" class="email">
+       <span class="type">pref</span><span>erred email</span>
+  </a></div>
+<div id="post-data">
+<hr/>
+<div id="post-title">cl-blog-generator Gets Comments</div>
+<div>Written: <span id="post-when">31-3-2009</span></div>
+<div><span id="post-updated"/></div>
+Tags: <div id="post-tags">
+<ul class="post-tags">
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/advogato.xhtml">advogato</a></li>
+
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/clbloggenerator.xhtml">cl-blog-generator</a></li>
+
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/lisp.xhtml">lisp</a></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>
