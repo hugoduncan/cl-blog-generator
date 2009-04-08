@@ -18,7 +18,8 @@
   ((:module "src"
 	    :components
 	    ((:file "package" )
-	     (:file "post" :depends-on ("package"))
+	     (:file "configure" :depends-on ("package"))
+	     (:file "post" :depends-on ("package" "configure"))
 	     (:file "comment-mail" :depends-on ("post"))))))
 
 (defsystem #:cl-blog-generator-test
