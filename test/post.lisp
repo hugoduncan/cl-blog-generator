@@ -8,7 +8,9 @@
 (defparameter *sane-tests*
   '(("this is a simple title" "this_is_a_simple_title")
     ("This is a Capitalised title" "this_is_a_capitalised_title")
-    ("This case's title has, (in-correct), punctuation!." "this_cases_title_has_incorrect_punctuation")))
+    ("This case's title has, (in-correct), punctuation!." "this_cases_title_has_incorrect_punctuation")
+    ("
+multiline" "multiline")))
 
 (deftest test-%sanitise-title ()
   (loop
@@ -27,23 +29,12 @@
 (defun fake-name ()
   (random-element *fake-names*))
 
-(defmacro with-test-db (&body body)
+(defmacro with-test-env (&body body)
 `(progn
    (configure :test)
-   (elephant:with-open-store (*blog-db-spec*)
-     (elephant:with-transaction ()
-       ,@body))))
+   ,@body))
 
 ;;;# Fixtures to revert output state
-(defun drop-all ()
-  (with-test-db
-    (loop for class in '(cl-blog-generator::blog-post cl-blog-generator::page
-			 cl-blog-generator::index-page cl-blog-generator::tag-page
-			 cl-blog-generator::generated-content cl-blog-generator::comment)
-       do (elephant:drop-instances
-	   (elephant:get-instances-by-class class)))
-    ( )))
-
 (defun draft-path (filename &key (type "post"))
   (merge-pathnames
    (make-pathname :directory '(:relative ".." "drafts") :name filename :type type)
@@ -55,7 +46,8 @@
 
 (defixture delete-all-fixture
     (:setup
-     (drop-all)
+     (setf cl-blog-generator::*blog* nil)
+     (setf cl-blog-generator::*index-page* nil)
      (loop for dir in (list *site-path* *published-path*)
 	do
 	  (ensure-directories-exist dir)
@@ -166,7 +158,7 @@
 
 (deftest test-%publish-draft-first ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(is (cl-fad:file-exists-p output-path))
@@ -197,7 +189,7 @@
 
 (deftest test-%publish-draft-second ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "second"))
 	(is (cl-fad:file-exists-p output-path))
@@ -219,7 +211,7 @@
   (let ((post-updated ;; this could cause problems testing at midnight
 	  (cl-blog-generator::decode-local-date (get-universal-time))))
     (with-fixture delete-all-fixture
-      (with-test-db
+      (with-test-env
 	(multiple-value-bind (output-path content)
 	    (cl-blog-generator::%publish-draft (draft-path "first" :type "page"))
 	  (is (cl-fad:file-exists-p output-path))
@@ -238,7 +230,7 @@
 
 (deftest test-%publish-draft-and-%publish-updated-post-first ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(declare (ignore blog-post))
@@ -277,7 +269,7 @@
 
 (deftest test-%publish-draft-and-%publish-updated-post-second ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "second"))
 	(declare (ignore blog-post))
@@ -315,7 +307,7 @@
 
 (deftest test-%adjacent-posts ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post1)
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(declare (ignore output-path))
@@ -341,7 +333,7 @@
 
 ;; (deftest test-%adjacent-posts-same-date ()
 ;;   (with-fixture delete-all-fixture
-;;     (with-test-db
+;;     (with-test-env
 ;;       (multiple-value-bind (output-path blog-post1)
 ;; 	  (cl-blog-generator::%publish-draft (draft-path "third"))
 ;; 	(declare (ignore output-path))
@@ -371,7 +363,7 @@
     (cl-blog-generator::publish-draft (draft-path "first"))
     (cl-blog-generator::publish-draft (draft-path "second"))
     (cl-blog-generator::publish-draft (draft-path "third"))
-    (with-test-db
+    (with-test-env
       (let ((index-page (cl-blog-generator::site-file-path-for
 			 (cl-blog-generator::index-page))))
 	(is (not (cl-fad:file-exists-p index-page)))
@@ -387,7 +379,7 @@
     (destructuring-bind (url path) (cl-blog-generator::generate-site)
       (is (stringp url))
       (is (stringp path))
-      (with-test-db
+      (with-test-env
 	(let ((index-page
 	       (cl-blog-generator::url-for
 		(cl-blog-generator::index-page))))
@@ -425,7 +417,7 @@
 
 (deftest test-tag-page-protocol ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (let ((tag-page (make-instance 'cl-blog-generator::tag-page :tag "atag")))
 	(is (string= (format nil "~Atag/atag.xhtml" cl-blog-generator::*site-path*)
 		     (namestring (cl-blog-generator::site-file-path-for tag-page))))
@@ -434,16 +426,16 @@
 
 (deftest test-%ensure-tag-pages-for ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(declare (ignore output-path))
 	(is (= 2 (length (cl-blog-generator::content-tags blog-post))))
-	(is (= 2 (length (elephant:get-instances-by-class 'cl-blog-generator::tag-page))))
+	(is (= 2 (length (cl-blog-generator::blog :tag-pages))))
 	(loop
 	   for tag in (cl-blog-generator::content-tags blog-post)
-	   for tag-page = (elephant:get-instance-by-value 'cl-blog-generator::tag-page
-							  'cl-blog-generator::tag tag)
+	   for tag-page = (cl-blog-generator::%blog-find-by
+			   :tag-pages #'cl-blog-generator::tag-page-tag tag)
 	   do
 	     (is tag-page)
 	     (is (= 1 (length (cl-blog-generator::tag-page-related-tags tag-page))))
@@ -463,17 +455,16 @@ Another paragraph http://somedomain.com/links."))
 (defvar *comment-regexes*
   '("<p>This is a comment</p>"
     "<p>This is a multi-paragraph comment</p><p>Another paragraph.</p>"
-    "<a href=\"http://somedomain.com/links\">http://somedomain.com/links</a>"))
-
+    "<a href=\"http://somedomain.com/links\" rel=\"nofollow\">http://somedomain.com/links</a>"))
 
 (deftest test-add-comment ()
   (with-fixture delete-all-fixture
-    (with-test-db
+    (with-test-env
       (multiple-value-bind (output-path blog-post)
 	  (cl-blog-generator::%publish-draft (draft-path "first"))
 	(declare (ignore output-path))
 	(loop for comment-text in *comment-texts*
-	     for comment-regex in *comment-regexes*
+	   for comment-regex in *comment-regexes*
 	   do
 	     (let* ((name (fake-name))
 		    (comment (cl-blog-generator::add-comment
@@ -498,7 +489,40 @@ Another paragraph http://somedomain.com/links."))
 	       (with-open-file (stream (cl-blog-generator::published-file-path-for comment))
 		 (let ((line (read-line stream)))
 		   (is (cl-ppcre:scan comment-regex line))))))
-	(is (= 3 (cl-blog-generator::%btree-length (cl-blog-generator::content-comments blog-post))))
+	(is (= 3 (length (cl-blog-generator::content-comments blog-post))))
 	(cl-blog-generator::generate blog-post)))))
 
 
+(deftest test-roundtrip ()
+  (with-fixture delete-all-fixture
+    (with-test-env
+      (multiple-value-bind (output-path blog-post)
+	  (cl-blog-generator::%publish-draft (draft-path "first"))
+	(declare (ignore output-path))
+	(let ((comment-time (get-universal-time)))
+	  (loop for comment-text in *comment-texts*
+	     do
+	     (let ((name (fake-name)))
+	       (cl-blog-generator::add-comment
+		(cl-blog-generator::content-filename blog-post)
+		"123.123.123.123"
+		name
+		"ab.cd@ef.com"
+		"http://freds domain"
+		comment-time
+		comment-text)))
+	  (cl-blog-generator::generate blog-post)
+
+	;; clear the in memory blog
+	  (setf cl-blog-generator::*blog* nil)
+	  (setf cl-blog-generator::*index-page* nil)
+
+	  (is (= 1 (length (cl-blog-generator::blog :posts))))
+	  (let ((blog-post2 (first (cl-blog-generator::blog :posts))))
+	    (is (equalp (cl-blog-generator::content-when blog-post)
+			(cl-blog-generator::content-when blog-post2)))
+	    (is (= 3 (length (cl-blog-generator::content-comments blog-post2))))
+	    (mapc (lambda (x)
+		    (is (eq blog-post2 (cl-blog-generator::content-page x)))
+		    (is (equalp comment-time (cl-blog-generator::comment-when x))))
+		  (cl-blog-generator::content-comments blog-post2))))))))

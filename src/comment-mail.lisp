@@ -10,8 +10,7 @@
 
 ;;; Top level moderate function
 (defun moderate ()
-  (with-open-store ()
-    (process-mailbox)))
+  (process-mailbox))
 
 ;;;# Process Mailbox
 ;;; Processes all incoming comments

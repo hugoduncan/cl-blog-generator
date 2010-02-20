@@ -26,6 +26,8 @@ environment active."
     (let ((alist-cons (assoc environment *environments*)))
       (unless alist-cons
 	(error "Request for unknown configuration environment ~A" environment))
+      (setf *blog* nil)
+      (setf *index-page* nil)
       (loop for item in (cdr alist-cons)
 	 for key = (car item)
 	 for symbol = (symbol-for-key key)

@@ -13,7 +13,7 @@
   :maintainer "Hugo Duncan <hugo@hugoduncan.org>"
   :licence "BSD Open Source"
   :description "A generator for blog sites."
-  :depends-on (:cxml :cl-fad :elephant :local-time :flexi-streams :mel-base :cl-ppcre :babel)
+  :depends-on (:cxml :cl-fad :local-time :flexi-streams :mel-base :cl-ppcre :babel)
   :components
   ((:module "src"
 	    :components

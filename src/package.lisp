@@ -10,6 +10,7 @@
 	   #:*blog-db-spec*
 	   #:*blog-domain*
 	   #:*blog-root-path*
+	   #:*comment-path*
 	   #:*site-path*
 	   #:*published-path*
 	   #:*template-path*

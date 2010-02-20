@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xml:lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+<link href="../../style.css" title="sans" media="screen" type="text/css" rel="stylesheet"/>
+<link href="../../feed.atom" title="Atom (full content)" type="application/atom+xml" rel="alternate"/>
+<title>cl-blog-generator : Benchmarking Clojure Code with Criterium</title><link rel="prev" href="/cl-blog-generator/content/site/post/2010/the_database_has_gone.xhtml" title="The database has gone!"/><link rel="next" href="/cl-blog-generator/content/site/post/2009/cl_blog_generator_gets_comments.xhtml" title="cl-blog-generator Gets Comments"/><meta name="description" content="I have released Criterium, a new project for benchmarking code in Clojure.  I found Brent Broyer's article on Java benchmarking which explains many of the pitfalls of benchmarking on the JVM, and Criterion, a benchmarking library in Haskell."/><meta name="keywords" content="jvm,criterium,benchmarking,benchmark,clojure"/>
+</head>
+<body>
+<div id="container">
+<div id="banner"><h1><span id="post-title">Benchmarking Clojure Code with Criterium</span></h1></div>
+<div id="centercontent">
+<div id="post"><p>I have released <a href="http://github.com/hugoduncan/criterium">Criterium</a>, a new project for benchmarking code in <a href="http://clojure.org">Clojure</a>.  I found Brent Broyer's <a href="http://www.ibm.com/developerworks/java/library/j-benchmark1.html">article on Java benchmarking</a> which explains many of the pitfalls of benchmarking on the JVM, and <a href="http://www.serpentine.com/blog/2009/09/29/criterion-a-new-benchmarking-library-for-haskell">Criterion</a>, a benchmarking library in Haskell.</p>
+
+<p>The main issues with benchmarking on the JVM are associated with garbage collection, and with JIT compilation.  It seems from Broyer's articles that we can mitigate the effects but not completely eliminate them, and Criterium follows his advice.  Both of the above libraries use the <a href="http://en.wikipedia.org/wiki/Bootstrapping_(statistics)">bootstrap</a> technique to estimate mean execution time and provide a confidence interval, and Criterium does likewise.  At the moment the confidence intervals are biased and I still need to implement BCa or ABC to improve these.</p>
+
+<p>One of the functions that I wanted to benchmark originally involved reading a file.  Criterium does not yet address clearing I/O buffer cache, and I am not sure on the best way forward on this.  On Mac OS X, the <code>purge</code> command can be used to clear the caches, and on Linux this can be achieved by writing to /proc/sys/vm/drop_caches.  On the Mac at least, this causes everything to grind to halt for about five seconds, and there are then some file reads as whatever processes are running read things in again. This sort of behaviour doesn't lend itself to inclusion in a timing loop... Any suggestions?</p>
+</div>
+</div>
+
+<div id="rightcontent">
+<div class="oo"><a href="../../index.xhtml" id="to-home"><span id="home">home</span></a></div>
+ <a href="" rel="me">source</a>
+ <a href="http://hugoduncan.org" rel="me">Hugo Duncan</a>
+<div class="vcard">
+  <a href="http://hugoduncan.org/" class="fn url">Hugo Duncan</a>
+  <div><a href="mailto:blogen@hugoduncan.org" class="email">
+       <span class="type">pref</span><span>erred email</span>
+  </a></div>
+<div id="post-data">
+<hr/>
+<div id="post-title">Benchmarking Clojure Code with Criterium</div>
+<div>Written: <span id="post-when">19-2-2010</span></div>
+<div><span id="post-updated"/></div>
+Tags: <div id="post-tags">
+<ul class="post-tags">
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/jvm.xhtml">jvm</a></li>
+
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/criterium.xhtml">criterium</a></li>
+
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/benchmarking.xhtml">benchmarking</a></li>
+
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/benchmark.xhtml">benchmark</a></li>
+
+  <li class="post-tag"><a href="/cl-blog-generator/content/site/tag/clojure.xhtml">clojure</a></li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body>
+</html>

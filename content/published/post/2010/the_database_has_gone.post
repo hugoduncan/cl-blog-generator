@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://hugoduncan.org/xmlns/post">
+<head>
+  <title>The database has gone!</title>
+  <tag>lisp</tag>
+  <tag>blog</tag>
+  <tag>cl-blog-generator</tag>
+<when day="19" month="2" year="2010"/><linkname>the_database_has_gone</linkname><template>post</template><meta name="description" content="I removed all dependencies on a database. No more elephant.  I was updating versions of lisp, elephant, etc, and got fed up of juggling clbuild, uffi, cffi, and elephant.  Anyway cl-blog-generator is much easier to use now, and is completely filesystem based.  I had always designed the database to be redundant.  Now it is.  Any existing blog should continue to just work, no migration required."/></head>
+<body>
+<p>I removed all dependencies on a database. No more elephant.  I was updating versions of lisp, elephant, etc, and got fed up of juggling clbuild, uffi, cffi, and elephant.  Anyway cl-blog-generator is much easier to use now, and is completely filesystem based.  I had always designed the database to be redundant.  Now it is.  Any existing blog should continue to just work, no migration required.</p>
+</body>
+</html>
